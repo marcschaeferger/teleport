@@ -3570,6 +3570,7 @@ func generateCert(ctx context.Context, a *Server, req internal.CertRequest, caTy
 				DeviceID:                req.DeviceExtensions.DeviceID,
 				DeviceAssetTag:          req.DeviceExtensions.AssetTag,
 				DeviceCredentialID:      req.DeviceExtensions.CredentialID,
+				DelegationSessionID:     req.DelegationSessionID,
 				GitHubUserID:            githubUserID,
 				GitHubUsername:          githubUsername,
 			},
@@ -3713,8 +3714,9 @@ func generateCert(ctx context.Context, a *Server, req internal.CertRequest, caTy
 			AssetTag:     req.DeviceExtensions.AssetTag,
 			CredentialID: req.DeviceExtensions.CredentialID,
 		},
-		UserType:       req.User.GetUserType(),
-		JoinAttributes: req.JoinAttributes,
+		UserType:            req.User.GetUserType(),
+		JoinAttributes:      req.JoinAttributes,
+		DelegationSessionID: req.DelegationSessionID,
 	}
 
 	var signedTLSCert []byte
