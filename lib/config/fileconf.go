@@ -1757,8 +1757,6 @@ func (b *BPF) Parse() *servicecfg.BPFConfig {
 		CommandBufferSize: b.CommandBufferSize,
 		DiskBufferSize:    b.DiskBufferSize,
 		NetworkBufferSize: b.NetworkBufferSize,
-		CgroupPath:        b.CgroupPath,
-		RootPath:          b.RootPath,
 	}
 }
 
