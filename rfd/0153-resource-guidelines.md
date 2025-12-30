@@ -262,7 +262,7 @@ Most legacy APIs do not provide a paginated way to retrieve resources and instea
 which either returns all `Foo` in a single message or leverages a server side stream to send each `Foo` one at a time.
 Returning all items in a single message causes problems when the number of resources scales beyond gRPC message size
 limits. To provide parity with this legacy API if needed, a helper method should be implemented on the client which
-builds the entire resource set by repeatedly calling `List` until all pages have been consumed, see the [clientutils][clientutils] package for more details.
+builds the entire resource set by repeatedly calling `List` until all pages have been consumed, see the [clientutils](https://github.com/gravitational/teleport/blob/ae1c0890bccf304b0bb40b9a2436501b4ec2a966/api/utils/clientutils/resources.go#L19) package for more details.
 
 ```protobuf
 // Returns a page of Foo and the token to find the next page of items.
@@ -332,7 +332,7 @@ If possible the structure of the token should be opaque to the client to prevent
 
 ##### Page Size
 
-Clients should make use of [clientutils][clientutils] to automatically adjust the page size when fetching resources:
+Clients should make use of [clientutils](https://github.com/gravitational/teleport/blob/ae1c0890bccf304b0bb40b9a2436501b4ec2a966/api/utils/clientutils/resources.go#L19) to automatically adjust the page size when fetching resources:
 ```go
 foos, err := clientutils.Resources(ctx, client.ListFoos)
 ```
@@ -915,5 +915,3 @@ message DeleteFooResponse {}
 ```
 
 </details>
-
-[clientutils]: (https://github.com/gravitational/teleport/blob/ae1c0890bccf304b0bb40b9a2436501b4ec2a966/api/utils/clientutils/resources.go#L19)
