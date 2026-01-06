@@ -302,26 +302,34 @@ against the backend has a potentially different view of the data. It is possible
 
 #### Sorting Support
 
-Note that as of time of writing (2025-11-24), field based sorting is possible in Cache only. 
+Note that as of time of writing (2025-11-24), advanced sorting is possible in Cache only.
 
 This is achieved via the [sortcache](https://github.com/gravitational/teleport/blob/96f222c00624e3f7ad3cbcd1859936420b438725/lib/utils/sortcache/sortcache.go#L47) package.
 
 Each index requires a dedicated key function that returns lexicographically sortable key, for example:
 
 ```go
-func FooTitleIndexKey(f *Foo) string {
-	title := cases.Fold().String(f.Spec.Title)
-	title = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(title))
-	return title + "/" + f.GetName()
+func (u *inventoryInstance) getAlphabeticalKey() bytestring {
+	var name, id string
+	if u.isInstance() {
+		name = u.instance.GetHostname()
+		id = u.instance.GetName()
+	} else {
+		name = u.bot.GetSpec().GetBotName()
+		id = u.bot.GetSpec().GetInstanceId()
+	}
+
+	return bytestring(ordered.Encode(name, id, u.getKind()))
 }
 ```
 
-This key is then reused as the pagination token. With the following considerations:
-1. Compound keys should use `"/"` as the separator.
-2. Keys should be lexicographically ordered for a given index.
-   1. For compound keys, consider order of components for the purpose of sorting.
-   2. Timestamps should make use of RFC3339 format.
-   3. Numerical components should consider zero padding.
+With the pagination token using a base32 representation of that key:
+```go
+nextPageToken = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(rawKey))
+```
+
+Compound keys should use make use of the `rsc.io/ordered` package.
+
 
 ##### Page Token contract
 
