@@ -19,7 +19,7 @@ package types
 import (
 	"bytes"
 
-	"github.com/gogo/protobuf/jsonpb"
+	"github.com/gogo/protobuf/jsonpb" //nolint:depguard // needed for backwards compatibility
 	"github.com/gravitational/trace"
 )
 
@@ -33,10 +33,10 @@ func (rc *ResourceConstraints) CheckAndSetDefaults() error {
 	} else if rc.Version != ResourceConstraintVersionV1 {
 		return trace.BadParameter("unsupported Constraints version %q", rc.Version)
 	}
-	switch d := rc.Details; d.(type) {
+	switch d := rc.Details.(type) {
 	case *ResourceConstraints_AwsConsole:
-		if rc.GetAwsConsole() == nil || len(rc.GetAwsConsole().RoleArns) == 0 {
-			return trace.BadParameter("aws_console constraints require role_arns, none provided")
+		if err := d.Validate(); err != nil {
+			return trace.Wrap(err)
 		}
 	default:
 		return trace.BadParameter("unsupported Details type %T", d)
@@ -46,7 +46,7 @@ func (rc *ResourceConstraints) CheckAndSetDefaults() error {
 
 func (rc *ResourceConstraints) MarshalJSON() ([]byte, error) {
 	if rc == nil {
-		return []byte("null"), nil
+		return []byte("undefined"), nil
 	}
 	var buf bytes.Buffer
 	m := &jsonpb.Marshaler{
@@ -65,4 +65,12 @@ func (rc *ResourceConstraints) UnmarshalJSON(b []byte) error {
 		AllowUnknownFields: false,
 	}
 	return trace.Wrap(u.Unmarshal(bytes.NewReader(b), rc))
+}
+
+// Validate ensures RoleArns is non-nil and contains Role ARNs.
+func (awsc *ResourceConstraints_AwsConsole) Validate() error {
+	if awsc == nil || awsc.AwsConsole == nil || len(awsc.AwsConsole.RoleArns) == 0 {
+		return trace.BadParameter("aws_console constraints require role_arns, none provided")
+	}
+	return nil
 }
