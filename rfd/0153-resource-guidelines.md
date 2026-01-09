@@ -256,7 +256,7 @@ message GetFooResponse {
 The `List` RPC takes the requested page size and starting point and returns a list of resources that match. If there are
 additional resources, the response MUST also include a token that indicates where the next page of results begins.
 
-`List` RPC can optionally provide a `Filter` message and/or a `SortBy` field where supported.
+`List` RPC can optionally provide a `Filter` message and/or a `SortMode` field where supported.
 
 Most legacy APIs do not provide a paginated way to retrieve resources and instead offer some kind of `GetAllFoos` RPC
 which either returns all `Foo` in a single message or leverages a server side stream to send each `Foo` one at a time.
@@ -274,10 +274,18 @@ message ListFoosRequest {
   int32 page_size = 1;
   // The next_page_token value returned from a previous List request, if any.
   string page_token = 2;
-  // sort_by specifies the sort order for the results.
-  types.SortBy sort_by = 3;
+
+  enum SortMode {
+    SORT_MODE_UNSPECIFIED = 0;
+    SORT_MODE_FIELD_EXAMPLE = 1;
+  }
+  // sort_mode specifies the sorting type for the results.
+  SortMode sort_mode = 3;
+  // is_sort_descending specifies sort direction
+  bool is_sort_descending = 4;
+
   // filter is a collection of fields to filter Foos
-  ListFoosFilter filter = 4;
+  ListFoosFilter filter = 5;
 }
 
 message ListFoosResponse {
@@ -328,8 +336,10 @@ With the pagination token using a base32 representation of that key:
 nextPageToken = base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(rawKey))
 ```
 
-Compound keys should use make use of the `rsc.io/ordered` package.
-
+1. Default sort mode must be the same and use the same key format as the pagination in the backend.
+2. Compound keys should use make use of the `rsc.io/ordered` package.
+3. Sorting options must remain unchanged for subsequent `List`.
+4. The backend should return a `*trace.CompareFailedError` if the sort mode is unsupported by the backend.
 
 ##### Page Token contract
 
