@@ -96,6 +96,7 @@ import (
 	_ "github.com/gravitational/license/generate"
 	_ "github.com/gravitational/roundtrip"
 	_ "github.com/gravitational/trace"
+	_ "github.com/invopop/jsonschema"
 	_ "github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/pgtype"
