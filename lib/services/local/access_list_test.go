@@ -62,7 +62,7 @@ func TestAccessListCRUD(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	// Create a couple access lists.
 	accessList1 := newAccessList(t, "accessList1", clock)
@@ -170,7 +170,7 @@ func Test_AccessList_validation_noTypeChange(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	type testCase struct {
 		name         string
@@ -236,7 +236,7 @@ func Test_AccessList_validation_DeprecatedDynamic_special_case(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	accessList := newAccessList(t, "test-scim-access-list-1", clock)
 
@@ -529,13 +529,7 @@ func TestAccessList_EntitlementLimits(t *testing.T) {
 						Clock:   clock,
 					})
 					require.NoError(t, err, "failed creating in-memory backend")
-					uut := newAccessListService(t, mem, clock, tc.igsEnabled)
-
-					// note - we do this _after_ creating the AccessList Service test
-					// target because the `newAccessListService()` fixture also sets the
-					// test modules, and that would clobber our test setup if we went
-					// first
-					modulestest.SetTestModules(t, modulestest.Modules{
+					uut := newAccessListService(t, mem, clock, &modulestest.Modules{
 						TestBuildType: modules.BuildEnterprise,
 						TestFeatures: modules.Features{
 							Entitlements: map[entitlements.EntitlementKind]modules.EntitlementInfo{
@@ -590,7 +584,7 @@ func TestAccessListCreate_UpdateAccessList(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	// No limit to creating access list.
 	result, err := service.UpsertAccessList(ctx, newAccessList(t, "accessList1", clock))
@@ -622,7 +616,7 @@ func TestAccessListDedupeOwnersBackwardsCompat(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	// Put an unduplicated owners access list in the backend.
 	accessListDuplicateOwners := newAccessList(t, "accessListDuplicateOwners", clock)
@@ -772,7 +766,7 @@ func TestUpsertAccessListWithMembers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	cmpOpts := []cmp.Option{
 		cmpopts.IgnoreFields(header.Metadata{}, "Revision"),
@@ -883,7 +877,7 @@ func TestUpdateAccessListAndOverwriteMembers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	cmpOpts := []cmp.Option{
 		cmpopts.IgnoreFields(header.Metadata{}, "Revision"),
@@ -978,7 +972,7 @@ func TestAccessListMembersCRUD(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	// Create a couple access lists.
 	accessList1 := newAccessList(t, "accessList1", clock)
@@ -1148,7 +1142,7 @@ func Test_AccessListMember_Validation(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	accessList := newAccessList(t, "test-access-list-1", clock)
 	accessList, err = service.UpsertAccessList(ctx, accessList)
@@ -1275,7 +1269,7 @@ func TestUpsertAndUpdateAccessListWithMembers_PreservesIdentityCenterLablesForEx
 		Clock:   clock,
 	})
 	require.NoError(t, err)
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	accessList1 := newAccessList(t, "accessList1", clock)
 	_, err = service.UpsertAccessList(ctx, accessList1)
@@ -1322,7 +1316,7 @@ func TestAccessListReviewCRUD(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	// Create a couple access lists.
 	accessList1 := newAccessList(t, "accessList1", clock)
@@ -1505,7 +1499,7 @@ func Test_CreateAccessListReview_NestedListMemberRemoval(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	a1, err := service.UpsertAccessList(ctx, newAccessList(t, "test_list_1", clock))
 	require.NoError(t, err)
@@ -1549,8 +1543,7 @@ func Test_CreateAccessListReview_FailForNonReviewable(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
-
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 	// Create a couple access lists.
 	accessList1 := newAccessList(t, "accessList1", clock, withType(accesslist.Static))
 	accessList2 := newAccessList(t, "accessList2", clock, withType(accesslist.SCIM))
@@ -1913,8 +1906,7 @@ func TestAccessListService_ListAllAccessListMembers(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
-
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 	const numAccessLists = 10
 	const numAccessListMembersPerAccessList = 250
 	totalMembers := numAccessLists * numAccessListMembersPerAccessList
@@ -1962,7 +1954,7 @@ func TestAccessListService_ListAllAccessListReviews(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	const numAccessLists = 10
 	const numAccessListReviewsPerAccessList = 250
@@ -2027,7 +2019,7 @@ func TestAccessListService_Status_OwnerOf(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	ownerAccessList1 := createAccessList(t, service, "test-owners-acl-"+uuid.NewString(), clock)
 	requireStatusOwnerOf(t, service, ownerAccessList1.GetName(), nil)
@@ -2120,7 +2112,7 @@ func TestAccessListService_Status_MemberOf(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	t.Run("creation for UpsertAccessListMember", func(t *testing.T) {
 		accessList := createAccessList(t, service, "test-acl-"+uuid.NewString(), clock)
@@ -2261,7 +2253,7 @@ func TestAccessListService_CleanupAccessListStatus(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	const a1, a2, a3, a4, a5, a6 = "al_1", "al_2", "al_3", "al_4", "al_5", "al_6"
 
@@ -2353,7 +2345,7 @@ func TestAccessListService_CleanupAccessListStatus_does_not_panic(t *testing.T) 
 		})
 		require.NoError(t, err)
 
-		service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+		service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 		const a1, a2, a3, a4, a5 = "al_1", "al_2", "al_3", "al_4", "al_5"
 
@@ -2373,7 +2365,7 @@ func TestAccessListService_CleanupAccessListStatus_does_not_panic(t *testing.T) 
 
 		// Recreate the service, but with the randomly erroring backend. This is a wrapper so all
 		// the data will be retained.
-		service = newAccessListService(t, backendtest.NewRandomlyErroringBackend(mem), clock, true /* igsEnabled */)
+		service = newAccessListService(t, backendtest.NewRandomlyErroringBackend(mem), clock, accessListServiceModules())
 
 		require.NotPanics(t, func() {
 			_, _ = service.CleanupAccessListStatus(ctx, a1)
@@ -2391,7 +2383,7 @@ func TestAccessListService_EnsureNestedAccessListStatuses(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	const a1, a2, a3, a4, a5, a6 = "al_1", "al_2", "al_3", "al_4", "al_5", "al_6"
 	const ghost = "ghost_list"
@@ -2485,19 +2477,21 @@ func requireStatusMemberOf(t *testing.T, service *AccessListService, accessListN
 	require.ElementsMatch(t, memberOf, accessList.Status.MemberOf)
 }
 
-func newAccessListService(t *testing.T, b backend.Backend, clock clockwork.Clock, igsEnabled bool) *AccessListService {
-	t.Helper()
-
-	modulestest.SetTestModules(t, modulestest.Modules{
+func accessListServiceModules() *modulestest.Modules {
+	return &modulestest.Modules{
 		TestFeatures: modules.Features{
 			Entitlements: map[entitlements.EntitlementKind]modules.EntitlementInfo{
-				entitlements.Identity:    {Enabled: igsEnabled},
+				entitlements.Identity:    {Enabled: true},
 				entitlements.AccessLists: {Enabled: true, Limit: 1},
 			},
 		},
-	})
+	}
+}
 
-	service, err := NewAccessListService(backend.NewSanitizer(b), clock)
+func newAccessListService(t *testing.T, b backend.Backend, clock clockwork.Clock, m *modulestest.Modules) *AccessListService {
+	t.Helper()
+
+	service, err := NewAccessListService(backend.NewSanitizer(b), clock, WithModules(m))
 	require.NoError(t, err)
 
 	return service
@@ -2521,7 +2515,7 @@ func TestInsertAccessListCollection(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+		service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 		list1 := newAccessList(t, "list1", clock)
 		list2 := newAccessList(t, "list2", clock)
@@ -2576,7 +2570,7 @@ func TestInsertAccessListCollection(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+		service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 		list1 := newAccessList(t, "list1", clock)
 		list2 := newAccessList(t, "list2", clock)
@@ -2604,7 +2598,7 @@ func TestInsertAccessListCollection(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+		service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 		collection := &accesslists.Collection{}
 
@@ -2677,7 +2671,7 @@ func runNestedAccessListCases(
 	})
 	require.NoError(t, err)
 
-	service := newAccessListService(t, mem, clock, true /* igsEnabled */)
+	service := newAccessListService(t, mem, clock, accessListServiceModules())
 
 	for _, tc := range cases {
 		tc := tc

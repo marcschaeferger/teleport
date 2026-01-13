@@ -18,7 +18,11 @@
 
 package local
 
-import "time"
+import (
+	"time"
+
+	"github.com/gravitational/teleport/lib/modules"
+)
 
 // ServiceOption is a functional option for configuring the service.
 // TODO(tigrato): Add support for other services besides the access list service.
@@ -26,11 +30,19 @@ type ServiceOption func(*serviceOptions)
 
 type serviceOptions struct {
 	runWhileLockedRetryInterval time.Duration
+	modules                     modules.Modules
 }
 
 // WithRunWhileLockedRetryInterval sets the retry interval for the RunWhileLocked function.
 func WithRunWhileLockedRetryInterval(interval time.Duration) ServiceOption {
 	return func(o *serviceOptions) {
 		o.runWhileLockedRetryInterval = interval
+	}
+}
+
+// WithModules sets the retry modules for the service.
+func WithModules(m modules.Modules) ServiceOption {
+	return func(o *serviceOptions) {
+		o.modules = m
 	}
 }

@@ -79,6 +79,7 @@ const (
 type AccessListService struct {
 	backend       backend.Backend
 	clock         clockwork.Clock
+	modules       modules.Modules
 	service       *generic.Service[*accesslist.AccessList]
 	memberService *generic.Service[*accesslist.AccessListMember]
 	reviewService *generic.Service[*accesslist.Review]
@@ -152,9 +153,16 @@ func NewAccessListService(b backend.Backend, clock clockwork.Clock, opts ...Serv
 		return nil, trace.Wrap(err)
 	}
 
+	// TODO(tross): Return an error instead of setting default modules
+	// once all callers are supplying modules.
+	if opt.modules == nil {
+		opt.modules = modules.GetModules()
+	}
+
 	return &AccessListService{
 		backend:       b,
 		clock:         clock,
+		modules:       opt.modules,
 		service:       service,
 		memberService: memberService,
 		reviewService: reviewService,
@@ -296,7 +304,7 @@ func (a *AccessListService) runOpWithLock(ctx context.Context, accessList *acces
 	// operation inside *another* lock so that we can accurately count the
 	// access lists in the cluster in order to prevent un-authorized use of
 	// the AccessList feature
-	if !modules.GetModules().Features().GetEntitlement(entitlements.Identity).Enabled {
+	if !a.modules.Features().GetEntitlement(entitlements.Identity).Enabled {
 		actions = append(actions, func() error { return a.VerifyAccessListCreateLimit(ctx, accessList.GetName()) })
 	}
 
@@ -822,7 +830,7 @@ func (a *AccessListService) writeAccessListWithMembers(ctx context.Context, acce
 	// member reconciliation in *another* lock so that we can accurately count the
 	// access lists in the cluster in order to  prevent un-authorized use of the
 	// AccessList feature
-	if !modules.GetModules().Features().GetEntitlement(entitlements.Identity).Enabled {
+	if !a.modules.Features().GetEntitlement(entitlements.Identity).Enabled {
 		actions = append(actions, func() error { return a.VerifyAccessListCreateLimit(ctx, accessList.GetName()) })
 	}
 
@@ -1054,7 +1062,7 @@ func lockName(accessListName string) []string {
 // access list name matches the ones we retrieved.
 // Returns error if limit has been reached.
 func (a *AccessListService) VerifyAccessListCreateLimit(ctx context.Context, targetAccessListName string) error {
-	f := modules.GetModules().Features()
+	f := a.modules.Features()
 	if f.GetEntitlement(entitlements.Identity).Enabled {
 		return nil // unlimited
 	}

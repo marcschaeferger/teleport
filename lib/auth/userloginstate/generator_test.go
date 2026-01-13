@@ -754,7 +754,7 @@ func initGeneratorSvc() (*Generator, *svc, error) {
 		return nil, nil, trace.Wrap(err)
 	}
 
-	accessListsSvc, err := local.NewAccessListService(mem, clock)
+	accessListsSvc, err := local.NewAccessListService(mem, clock, local.WithModules(modulestest.EnterpriseModules()))
 	if err != nil {
 		return nil, nil, trace.Wrap(err)
 	}
