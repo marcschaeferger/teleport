@@ -18,9 +18,7 @@
 
 package local
 
-import (
-	"time"
-)
+import "time"
 
 // ServiceOption is a functional option for configuring the service.
 // TODO(tigrato): Add support for other services besides the access list service.
