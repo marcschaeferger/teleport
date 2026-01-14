@@ -110,7 +110,7 @@ var _ services.AccessLists = (*AccessListService)(nil)
 // AccessListServiceConfig contains dependencies required to construct
 // an AccessListService.
 type AccessListServiceConfig struct {
-	// Backend is the persistant storage mechanism.
+	// Backend is the persistent storage mechanism.
 	Backend backend.Backend
 	// Modules specifies which AccessList features are enabled.
 	Modules modules.Modules
@@ -165,7 +165,7 @@ func NewAccessListServiceV2(cfg AccessListServiceConfig) (*AccessListService, er
 	}
 
 	return &AccessListService{
-		backend: cfg.Backend,
+		backend:       cfg.Backend,
 		modules:       cfg.Modules,
 		service:       service,
 		memberService: memberService,
