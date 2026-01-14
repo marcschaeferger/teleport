@@ -1352,7 +1352,7 @@
     },
     {
       "source": "/admin-guides/management/admin/daemon/",
-      "destination": "/zero-trust-access/management/daemon/",
+      "destination": "/reference/cli/teleport/",
       "permanent": true
     },
     {
@@ -3439,7 +3439,7 @@
     },
     {
       "source": "/zero-trust-access/management/admin/daemon/",
-      "destination": "/zero-trust-access/management/daemon/",
+      "destination": "/reference/cli/teleport/",
       "permanent": true
     },
     {
@@ -3475,6 +3475,11 @@
     {
       "source": "/enroll-resources/application-access/introduction/",
       "destination": "/enroll-resources/application-access/getting-started/",
+      "permanent": true
+    },
+    {
+      "source": "/zero-trust-access/management/daemon/",
+      "destination": "/reference/cli/teleport/",
       "permanent": true
     }
   ]
