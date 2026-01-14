@@ -1735,7 +1735,10 @@ func TestUpdateAccessRequestWithAdditionalReviewers(t *testing.T) {
 			mem, err := memory.New(memory.Config{})
 			require.NoError(t, err)
 
-			accessLists, err := local.NewAccessListService(mem, clock, local.WithModules(testModules))
+			accessLists, err := local.NewAccessListServiceV2(local.AccessListServiceConfig{
+				Backend: mem,
+				Modules: testModules,
+			})
 			require.NoError(t, err)
 
 			ctx := context.Background()

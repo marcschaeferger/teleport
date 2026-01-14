@@ -78,7 +78,6 @@ const (
 // about granting or withholding list membership.
 type AccessListService struct {
 	backend       backend.Backend
-	clock         clockwork.Clock
 	modules       modules.Modules
 	service       *generic.Service[*accesslist.AccessList]
 	memberService *generic.Service[*accesslist.AccessListMember]
@@ -108,65 +107,86 @@ func (s *accessListAndMembersGetter) GetAccessListMember(ctx context.Context, ac
 // interface
 var _ services.AccessLists = (*AccessListService)(nil)
 
-// NewAccessListService creates a new AccessListService.
-func NewAccessListService(b backend.Backend, clock clockwork.Clock, opts ...ServiceOption) (*AccessListService, error) {
-	var opt serviceOptions
-	for _, o := range opts {
-		o(&opt)
+// AccessListServiceConfig contains dependencies required to construct
+// an AccessListService.
+type AccessListServiceConfig struct {
+	// Backend is the persistant storage mechanism.
+	Backend backend.Backend
+	// Modules specifies which AccessList features are enabled.
+	Modules modules.Modules
+	// RunWhileLockedRetryInterval alters locking behavior when interacting with the backend.
+	// This allows tests to run faster.
+	RunWhileLockedRetryInterval time.Duration
+}
+
+// NewAccessListServiceV2 creates a new AccessListService.
+func NewAccessListServiceV2(cfg AccessListServiceConfig) (*AccessListService, error) {
+	if cfg.Modules == nil {
+		return nil, trace.BadParameter("Modules are a required parameter for the AccessListService")
 	}
+
 	service, err := generic.NewService(&generic.ServiceConfig[*accesslist.AccessList]{
-		Backend:                     b,
+		Backend:                     cfg.Backend,
 		PageLimit:                   accessListMaxPageSize,
 		ResourceKind:                types.KindAccessList,
 		BackendPrefix:               backend.NewKey(accessListPrefix),
 		MarshalFunc:                 services.MarshalAccessList,
 		UnmarshalFunc:               services.UnmarshalAccessList,
-		RunWhileLockedRetryInterval: opt.runWhileLockedRetryInterval,
+		RunWhileLockedRetryInterval: cfg.RunWhileLockedRetryInterval,
 	})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
 	memberService, err := generic.NewService(&generic.ServiceConfig[*accesslist.AccessListMember]{
-		Backend:                     b,
+		Backend:                     cfg.Backend,
 		PageLimit:                   accessListMemberMaxPageSize,
 		ResourceKind:                types.KindAccessListMember,
 		BackendPrefix:               backend.NewKey(accessListMemberPrefix),
 		MarshalFunc:                 services.MarshalAccessListMember,
 		UnmarshalFunc:               services.UnmarshalAccessListMember,
-		RunWhileLockedRetryInterval: opt.runWhileLockedRetryInterval,
+		RunWhileLockedRetryInterval: cfg.RunWhileLockedRetryInterval,
 	})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
 	reviewService, err := generic.NewService(&generic.ServiceConfig[*accesslist.Review]{
-		Backend:                     b,
+		Backend:                     cfg.Backend,
 		PageLimit:                   accessListReviewMaxPageSize,
 		ResourceKind:                types.KindAccessListReview,
 		BackendPrefix:               backend.NewKey(accessListReviewPrefix),
 		MarshalFunc:                 services.MarshalAccessListReview,
 		UnmarshalFunc:               services.UnmarshalAccessListReview,
-		RunWhileLockedRetryInterval: opt.runWhileLockedRetryInterval,
+		RunWhileLockedRetryInterval: cfg.RunWhileLockedRetryInterval,
 	})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	// TODO(tross): Return an error instead of setting default modules
-	// once all callers are supplying modules.
-	if opt.modules == nil {
-		opt.modules = modules.GetModules()
-	}
-
 	return &AccessListService{
-		backend:       b,
-		clock:         clock,
-		modules:       opt.modules,
+		backend: cfg.Backend,
+		modules:       cfg.Modules,
 		service:       service,
 		memberService: memberService,
 		reviewService: reviewService,
 	}, nil
+}
+
+// NewAccessListService creates a new AccessListService.
+// Deprecated: Prefer using NewAccessListServiceV2
+// TODO(tross): Delete when everything is using V2.
+func NewAccessListService(b backend.Backend, clock clockwork.Clock, opts ...ServiceOption) (*AccessListService, error) {
+	var opt serviceOptions
+	for _, o := range opts {
+		o(&opt)
+	}
+
+	return NewAccessListServiceV2(AccessListServiceConfig{
+		Backend:                     b,
+		Modules:                     modules.GetModules(),
+		RunWhileLockedRetryInterval: opt.runWhileLockedRetryInterval,
+	})
 }
 
 // GetAccessLists returns a list of all access lists.

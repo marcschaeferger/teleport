@@ -391,7 +391,10 @@ func TestGetHierarchyForUser(t *testing.T) {
 				Clock:   clock,
 			})
 			require.NoError(t, err)
-			svc, err := local.NewAccessListService(bk, clock, local.WithModules(testModules))
+			svc, err := local.NewAccessListServiceV2(local.AccessListServiceConfig{
+				Backend: bk,
+				Modules: testModules,
+			})
 			require.NoError(t, err)
 
 			require.NoError(t, upsertState(svc, tt.state))

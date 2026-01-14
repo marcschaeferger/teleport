@@ -152,7 +152,10 @@ func setupTestCache(t *testing.T, setupConfig cache.SetupConfigFn) (*testCache, 
 	secReportsSvc, err := local.NewSecReportsService(bkWrapper, bkWrapper.Clock())
 	require.NoError(t, err)
 
-	accessListsSvc, err := local.NewAccessListService(bkWrapper, bkWrapper.Clock(), local.WithModules(modulestest.OSSModules()))
+	accessListsSvc, err := local.NewAccessListServiceV2(local.AccessListServiceConfig{
+		Backend: bkWrapper,
+		Modules: modulestest.OSSModules(),
+	})
 	require.NoError(t, err)
 
 	accessMonitoringRuleService, err := local.NewAccessMonitoringRulesService(bkWrapper)

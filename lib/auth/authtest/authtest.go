@@ -313,11 +313,11 @@ func NewAuthServer(cfg AuthServerConfig) (*AuthServer, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	accessLists, err := local.NewAccessListService(srv.Backend, cfg.Clock,
-		local.WithRunWhileLockedRetryInterval(cfg.RunWhileLockedRetryInterval),
+	accessLists, err := local.NewAccessListServiceV2(local.AccessListServiceConfig{
+		Backend: srv.Backend,
 		// TODO(tross): replace with cfg.Modules
-		local.WithModules(modules.GetModules()),
-	)
+		Modules: modules.GetModules(),
+	})
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
