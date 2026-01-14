@@ -817,7 +817,7 @@ func TestResourceIDsToResourceAccessIDs(t *testing.T) {
 	require.Nil(t, out[1].GetConstraints())
 
 	// Nil input should be safe and return an empty slice.
-	require.Len(t, ResourceIDsToResourceAccessIDs(nil), 0)
+	require.Empty(t, ResourceIDsToResourceAccessIDs(nil))
 }
 
 func TestCombineAsResourceAccessIDs(t *testing.T) {
@@ -899,8 +899,8 @@ func TestUnwrapResourceAccessIDs(t *testing.T) {
 
 	t.Run("empty input", func(t *testing.T) {
 		plainIDs, accessIDs := UnwrapResourceAccessIDs(nil)
-		require.Len(t, plainIDs, 0)
-		require.Len(t, accessIDs, 0)
+		require.Empty(t, plainIDs)
+		require.Empty(t, accessIDs)
 	})
 }
 
@@ -923,5 +923,5 @@ func TestExtractResourceIDs(t *testing.T) {
 	out := ExtractResourceIDs([]ResourceAccessID{a1, a2})
 	require.Equal(t, []ResourceID{a1.Id, a2.Id}, out)
 
-	require.Len(t, ExtractResourceIDs(nil), 0)
+	require.Empty(t, ExtractResourceIDs(nil))
 }
