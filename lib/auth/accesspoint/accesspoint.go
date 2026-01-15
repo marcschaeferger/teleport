@@ -115,6 +115,7 @@ type Config struct {
 	RecordingEncryption     services.RecordingEncryption
 	Plugin                  services.Plugins
 	AppAuthConfig           services.AppAuthConfigReader
+	WorkloadClusterService  services.WorkloadClusterService
 }
 
 func (c *Config) CheckAndSetDefaults() error {
@@ -202,6 +203,7 @@ func NewCache(cfg Config) (*cache.Cache, error) {
 		RecordingEncryption:     cfg.RecordingEncryption,
 		Plugin:                  cfg.Plugin,
 		AppAuthConfig:           cfg.AppAuthConfig,
+		WorkloadClusterService:  cfg.WorkloadClusterService,
 	}
 
 	return cache.New(cfg.Setup(cacheCfg))
