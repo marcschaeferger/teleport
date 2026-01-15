@@ -38,6 +38,7 @@ import (
 	recordingencryptionv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/recordingencryption/v1"
 	userprovisioningv2 "github.com/gravitational/teleport/api/gen/proto/go/teleport/userprovisioning/v2"
 	usertasksv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/usertasks/v1"
+	workloadclusterv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/workloadcluster/v1"
 	workloadidentityv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/workloadidentity/v1"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/types/accesslist"
@@ -146,6 +147,7 @@ type collections struct {
 	recordingEncryption                *collection[*recordingencryptionv1.RecordingEncryption, recordingEncryptionIndex]
 	plugins                            *collection[types.Plugin, pluginIndex]
 	appAuthConfig                      *collection[*appauthconfigv1.AppAuthConfig, appAuthConfigIndex]
+	workloadClusters                   *collection[*workloadclusterv1.WorkloadCluster, workloadClusterIndex]
 }
 
 // isKnownUncollectedKind is true if a resource kind is not stored in
