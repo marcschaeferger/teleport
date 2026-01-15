@@ -1077,6 +1077,9 @@ func (t StaticToken) Parse() ([]types.ProvisionTokenV1, error) {
 	return provisionTokens, nil
 }
 
+// StaticScopedTokens is the list of [StaticScopedToken] configurations that
+// should be used to generate the auth service's [joiningv1.StaticScopedTokens]
+// resource.
 type StaticScopedTokens []StaticScopedToken
 
 func (t StaticScopedTokens) Parse() (*joiningv1.StaticScopedTokens, error) {
@@ -1140,7 +1143,8 @@ func (t StaticScopedTokens) Parse() (*joiningv1.StaticScopedTokens, error) {
 	}, nil
 }
 
-// StaticScopedToken is a statically defined scoped token. It is used to
+// StaticScopedToken is a statically defined scoped token. It is meant to capture
+// yaml configuration that can be used to generate a [joiningv1.ScopedToken].
 type StaticScopedToken struct {
 	Name   string   `yaml:"name"`
 	Secret string   `yaml:"secret"`

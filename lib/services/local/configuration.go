@@ -197,12 +197,12 @@ func (s *ClusterConfigurationService) GetStaticScopedTokens(ctx context.Context)
 }
 
 // SetStaticScopedTokens sets the list of static scoped tokens used to provision nodes.
-func (s *ClusterConfigurationService) SetStaticScopedTokens(c *joiningv1.StaticScopedTokens) error {
+func (s *ClusterConfigurationService) SetStaticScopedTokens(ctx context.Context, c *joiningv1.StaticScopedTokens) error {
 	value, err := utils.FastMarshal(c)
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	_, err = s.Put(context.TODO(), backend.Item{
+	_, err = s.Put(ctx, backend.Item{
 		Key:      backend.NewKey(clusterConfigPrefix, staticScopedTokensPrefix),
 		Value:    value,
 		Revision: c.GetMetadata().GetRevision(),
@@ -214,9 +214,9 @@ func (s *ClusterConfigurationService) SetStaticScopedTokens(c *joiningv1.StaticS
 	return nil
 }
 
-// DeleteStaticScopedTokens deletes static scoped tokens
-func (s *ClusterConfigurationService) DeleteStaticScopedTokens() error {
-	err := s.Delete(context.TODO(), backend.NewKey(clusterConfigPrefix, staticScopedTokensPrefix))
+// DeleteStaticScopedTokens deletes the list of static scoped tokens.
+func (s *ClusterConfigurationService) DeleteStaticScopedTokens(ctx context.Context) error {
+	err := s.Delete(ctx, backend.NewKey(clusterConfigPrefix, staticScopedTokensPrefix))
 	if err != nil {
 		if trace.IsNotFound(err) {
 			return trace.NotFound("static scoped tokens are not found")

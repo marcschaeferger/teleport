@@ -678,7 +678,7 @@ func (c *Client) DeleteStaticTokens() error {
 }
 
 // DeleteStaticScopedTokens deletes static scoped tokens
-func (c *Client) DeleteStaticScopedTokens() error {
+func (c *Client) DeleteStaticScopedTokens(ctx context.Context) error {
 	return trace.NotImplemented(notImplementedMessage)
 }
 
@@ -689,7 +689,6 @@ func (c *Client) GetStaticTokens(ctx context.Context) (types.StaticTokens, error
 
 // GetStaticScopedTokens returns a list of static, scoped join tokens
 func (c *Client) GetStaticScopedTokens(ctx context.Context) (*joiningv1.StaticScopedTokens, error) {
-	// return c.APIClient.GetStaticScopedTokens(ctx)
 	return nil, trace.NotImplemented(notImplementedMessage)
 }
 
@@ -699,7 +698,7 @@ func (c *Client) SetStaticTokens(st types.StaticTokens) error {
 }
 
 // SetStaticScopedTokens sets a list of static, scoped join tokens
-func (c *Client) SetStaticScopedTokens(st *joiningv1.StaticScopedTokens) error {
+func (c *Client) SetStaticScopedTokens(ctx context.Context, st *joiningv1.StaticScopedTokens) error {
 	return trace.NotImplemented(notImplementedMessage)
 }
 

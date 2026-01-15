@@ -50,12 +50,12 @@ type ClusterConfiguration interface {
 	// SetStaticTokens sets services.StaticTokens on the backend.
 	SetStaticTokens(types.StaticTokens) error
 	// SetStaticScopedTokens sets [*joiningv1.StaticScopedTokens] to the backend.
-	SetStaticScopedTokens(*joiningv1.StaticScopedTokens) error
+	SetStaticScopedTokens(context.Context, *joiningv1.StaticScopedTokens) error
 	// DeleteStaticTokens deletes static tokens resource
 	DeleteStaticTokens() error
 	// DeleteStaticScopedTokens deletes the [*joiningv1.StaticScopedTokens] resource resource
 	// from the backend
-	DeleteStaticScopedTokens() error
+	DeleteStaticScopedTokens(context.Context) error
 
 	// GetUIConfig gets the proxy service UI config from the backend
 	GetUIConfig(context.Context) (types.UIConfig, error)

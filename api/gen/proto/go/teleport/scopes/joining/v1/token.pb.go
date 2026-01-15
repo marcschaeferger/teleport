@@ -502,7 +502,9 @@ func (x *ScopedTokenStatus) GetUsage() *UsageStatus {
 	return nil
 }
 
-// The resource representing static scoped tokens.
+// The resource representing static scoped tokens defined in the auth service file configuration. These are
+// represented as a separate resource so that they can be managed separately from dynamic scoped tokens as
+// a singleton.
 type StaticScopedTokens struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The resource kind.
