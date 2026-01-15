@@ -602,6 +602,7 @@ func newPack(t testing.TB, setupConfig func(c Config) Config, opts ...packOption
 		MaxRetryPeriod:          200 * time.Millisecond,
 		EventsC:                 p.eventsC,
 		AppAuthConfig:           p.appAuthConfigs,
+		WorkloadClusterService:  p.workloadClusters,
 	}))
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -872,6 +873,7 @@ func TestCompletenessInit(t *testing.T) {
 			BotInstanceService:      p.botInstanceService,
 			Plugin:                  p.plugin,
 			AppAuthConfig:           p.appAuthConfigs,
+			WorkloadClusterService:  p.workloadClusters,
 		}))
 		require.NoError(t, err)
 
@@ -961,6 +963,7 @@ func TestCompletenessReset(t *testing.T) {
 		BotInstanceService:      p.botInstanceService,
 		Plugin:                  p.plugin,
 		AppAuthConfig:           p.appAuthConfigs,
+		WorkloadClusterService:  p.workloadClusters,
 	}))
 	require.NoError(t, err)
 
@@ -1122,6 +1125,7 @@ func TestListResources_NodesTTLVariant(t *testing.T) {
 		BotInstanceService:      p.botInstanceService,
 		Plugin:                  p.plugin,
 		AppAuthConfig:           p.appAuthConfigs,
+		WorkloadClusterService:  p.workloadClusters,
 	}))
 	require.NoError(t, err)
 
@@ -1222,6 +1226,7 @@ func initStrategy(t *testing.T) {
 		BotInstanceService:      p.botInstanceService,
 		Plugin:                  p.plugin,
 		AppAuthConfig:           p.appAuthConfigs,
+		WorkloadClusterService:  p.workloadClusters,
 	}))
 	require.NoError(t, err)
 
@@ -1967,6 +1972,7 @@ func TestCacheWatchKindExistsInEvents(t *testing.T) {
 		types.KindRelayServer:                       types.ProtoResource153ToLegacy(new(presencev1.RelayServer)),
 		types.KindBotInstance:                       types.ProtoResource153ToLegacy(new(machineidv1.BotInstance)),
 		types.KindAppAuthConfig:                     types.Resource153ToLegacy(new(appauthconfigv1.AppAuthConfig)),
+		types.KindWorkloadCluster:                   types.Resource153ToLegacy(newWorkloadCluster(t, "test")),
 	}
 
 	for name, cfg := range cases {
@@ -2040,6 +2046,8 @@ func TestCacheWatchKindExistsInEvents(t *testing.T) {
 					require.Empty(t, cmp.Diff(resource.(types.Resource153UnwrapperT[*machineidv1.BotInstance]).UnwrapT(), uw.UnwrapT(), protocmp.Transform()))
 				case types.Resource153UnwrapperT[*appauthconfigv1.AppAuthConfig]:
 					require.Empty(t, cmp.Diff(resource.(types.Resource153UnwrapperT[*appauthconfigv1.AppAuthConfig]).UnwrapT(), uw.UnwrapT(), protocmp.Transform()))
+				case types.Resource153UnwrapperT[*workloadclusterv1.WorkloadCluster]:
+					require.Empty(t, cmp.Diff(resource.(types.Resource153UnwrapperT[*workloadclusterv1.WorkloadCluster]).UnwrapT(), uw.UnwrapT(), protocmp.Transform()))
 				default:
 					require.Empty(t, cmp.Diff(resource, event.Resource))
 				}
