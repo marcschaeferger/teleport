@@ -35,13 +35,13 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/julienschmidt/httprouter"
 
-	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	apiutils "github.com/gravitational/teleport/api/utils"
 	"github.com/gravitational/teleport/api/utils/clientutils"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/httplib"
 	"github.com/gravitational/teleport/lib/itertools/stream"
+	"github.com/gravitational/teleport/lib/modules"
 	"github.com/gravitational/teleport/lib/services"
 	"github.com/gravitational/teleport/lib/tlsca"
 	"github.com/gravitational/teleport/lib/ui"
@@ -81,7 +81,7 @@ type scriptSettings struct {
 }
 
 // automaticUpgrades returns whether automaticUpgrades should be enabled.
-func automaticUpgrades(features proto.Features) bool {
+func automaticUpgrades(features modules.Features) bool {
 	return features.AutomaticUpgrades && features.Cloud
 }
 

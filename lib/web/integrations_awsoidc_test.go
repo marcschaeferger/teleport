@@ -1088,8 +1088,10 @@ func TestAWSOIDCSecurityGroupsRulesConverter(t *testing.T) {
 }
 
 func TestAWSOIDCAppAccessAppServerCreationDeletion(t *testing.T) {
+	t.Parallel()
+
 	env := newWebPack(t, 1)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	roleTokenCRD, err := types.NewRole(services.RoleNameForUser("my-user"), types.RoleSpecV6{
 		Allow: types.RoleConditions{
@@ -1213,12 +1215,12 @@ func TestAWSOIDCAppAccessAppServerCreationDeletion(t *testing.T) {
 func enableCloudFeatureProxy(t *testing.T, proxy *testProxy) {
 	t.Helper()
 
-	existingFeatures := proxy.handler.handler.clusterFeatures
+	existingFeatures := proxy.handler.handler.cfg.Modules.Features()
 	existingFeatures.Cloud = true
-	proxy.handler.handler.clusterFeatures = existingFeatures
+	proxy.handler.handler.cfg.Modules.SetFeatures(existingFeatures)
 	t.Cleanup(func() {
 		existingFeatures.Cloud = false
-		proxy.handler.handler.clusterFeatures = existingFeatures
+		proxy.handler.handler.cfg.Modules.SetFeatures(existingFeatures)
 	})
 }
 

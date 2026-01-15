@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto"
 	"fmt"
+	"maps"
 	"runtime"
 	"testing"
 	"time"
@@ -118,7 +119,25 @@ func (m *Modules) EnableRecoveryCodes() {}
 
 // Features implements modules.Modules.
 func (m *Modules) Features() modules.Features {
-	return m.TestFeatures
+	return modules.Features{
+		Cloud:                      m.TestFeatures.Cloud,
+		CustomTheme:                m.TestFeatures.CustomTheme,
+		IsStripeManaged:            m.TestFeatures.IsStripeManaged,
+		IsUsageBasedBilling:        m.TestFeatures.IsUsageBasedBilling,
+		Questionnaire:              m.TestFeatures.Questionnaire,
+		SupportType:                m.TestFeatures.SupportType,
+		Entitlements:               maps.Clone(m.TestFeatures.Entitlements),
+		CloudAnonymizationKey:      m.TestFeatures.CloudAnonymizationKey,
+		AdvancedAccessWorkflows:    m.TestFeatures.AdvancedAccessWorkflows,
+		RecoveryCodes:              m.TestFeatures.RecoveryCodes,
+		Plugins:                    m.TestFeatures.Plugins,
+		AutomaticUpgrades:          m.TestFeatures.AutomaticUpgrades,
+		AccessGraph:                m.TestFeatures.AccessGraph,
+		AccessMonitoringConfigured: m.TestFeatures.AccessMonitoringConfigured,
+		AccessControls:             m.TestFeatures.AccessControls,
+		Assist:                     m.TestFeatures.Assist,
+		ProductType:                m.TestFeatures.ProductType,
+	}
 }
 
 // GenerateLongTermResourceGrouping implements modules.Modules.
@@ -168,7 +187,9 @@ func (m *Modules) PrintVersion() {
 }
 
 // SetFeatures implements modules.Modules.
-func (m *Modules) SetFeatures(features modules.Features) {}
+func (m *Modules) SetFeatures(features modules.Features) {
+	m.TestFeatures = features
+}
 
 // SetTestModules sets the value returned from GetModules to testModules
 // and reverts the change in the test cleanup function.

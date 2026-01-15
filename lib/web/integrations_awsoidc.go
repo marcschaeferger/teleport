@@ -161,7 +161,7 @@ func (h *Handler) awsOIDCDeployService(w http.ResponseWriter, r *http.Request, p
 	}
 
 	teleportVersionTag := teleport.Version
-	if automaticUpgrades(h.GetClusterFeatures()) {
+	if automaticUpgrades(h.cfg.Modules.Features()) {
 		const group, updaterUUID = "", ""
 		autoUpdateVersion, err := h.autoUpdateResolver.GetVersion(r.Context(), group, updaterUUID)
 		if err != nil {
@@ -217,7 +217,7 @@ func (h *Handler) awsOIDCDeployDatabaseServices(w http.ResponseWriter, r *http.R
 	}
 
 	teleportVersionTag := teleport.Version
-	if automaticUpgrades(h.GetClusterFeatures()) {
+	if automaticUpgrades(h.cfg.Modules.Features()) {
 		const group, updaterUUID = "", ""
 		autoUpdateVersion, err := h.autoUpdateResolver.GetVersion(r.Context(), group, updaterUUID)
 		if err != nil {
@@ -1124,7 +1124,7 @@ func (h *Handler) awsOIDCCreateAWSAppAccess(w http.ResponseWriter, r *http.Reque
 	// If the integration name contains a dot, then the proxy must provide a certificate allowing *.<something>.<proxyPublicAddr>
 	if strings.Contains(integrationName, ".") {
 		// Teleport Cloud only provides certificates for *.<tenant>.teleport.sh, so this would generate an invalid address.
-		if h.GetClusterFeatures().Cloud {
+		if h.cfg.Modules.Features().Cloud {
 			return nil, trace.BadParameter(`Invalid integration name (%q) for enabling AWS Access. Please re-create the integration without the "."`, integrationName)
 		}
 

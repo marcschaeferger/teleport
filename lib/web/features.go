@@ -21,6 +21,7 @@ package web
 import (
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/entitlements"
+	"github.com/gravitational/teleport/lib/modules"
 )
 
 // SetClusterFeatures sets the flags for supported and unsupported features.
@@ -31,7 +32,7 @@ func (h *Handler) SetClusterFeatures(features proto.Features) {
 	defer h.Mutex.Unlock()
 
 	entitlements.BackfillFeatures(&features)
-	h.clusterFeatures = features
+	h.cfg.Modules.SetFeatures(modules.FeaturesFromProto(&features))
 }
 
 // GetClusterFeatures returns flags for supported and unsupported features.
@@ -39,7 +40,7 @@ func (h *Handler) GetClusterFeatures() proto.Features {
 	h.Mutex.Lock()
 	defer h.Mutex.Unlock()
 
-	return h.clusterFeatures
+	return *h.cfg.Modules.Features().ToProto()
 }
 
 // startFeatureWatcher periodically pings the auth server and updates `clusterFeatures`.
@@ -62,8 +63,8 @@ func (h *Handler) startFeatureWatcher() {
 				h.logger.ErrorContext(ctx, "Auth server ping failed", "error", err)
 				continue
 			}
-
-			h.SetClusterFeatures(*pingResponse.ServerFeatures)
+			entitlements.BackfillFeatures(pingResponse.ServerFeatures)
+			h.cfg.Modules.SetFeatures(modules.FeaturesFromProto(pingResponse.ServerFeatures))
 			h.logger.InfoContext(ctx, "Done updating proxy features", "features", pingResponse.ServerFeatures)
 		case <-ctx.Done():
 			h.logger.InfoContext(ctx, "Feature service has stopped")

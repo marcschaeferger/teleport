@@ -115,6 +115,43 @@ func (e EntitlementInfo) UnderLimit(count int) bool {
 	return e.Enabled && (e.Limit == 0 || count < int(e.Limit))
 }
 
+func FeaturesFromProto(features *proto.Features) Features {
+	productType := ProductTypeUnknown
+	switch features.GetProductType() {
+	case proto.ProductType_PRODUCT_TYPE_TEAM:
+		productType = ProductTypeTeam
+	case proto.ProductType_PRODUCT_TYPE_EUB:
+		productType = ProductTypeEUB
+	}
+
+	e := make(map[entitlements.EntitlementKind]EntitlementInfo, len(features.GetEntitlements()))
+	for kind, entitlement := range features.GetEntitlements() {
+		e[entitlements.EntitlementKind(kind)] = EntitlementInfo{
+			Enabled: entitlement.GetEnabled(),
+			Limit:   entitlement.GetLimit(),
+		}
+	}
+
+	return Features{
+		Cloud:                      features.GetCloud(),
+		CustomTheme:                features.GetCustomTheme(),
+		IsStripeManaged:            features.GetIsStripeManaged(),
+		IsUsageBasedBilling:        features.GetIsUsageBased(),
+		Questionnaire:              features.GetQuestionnaire(),
+		SupportType:                features.GetSupportType(),
+		Entitlements:               e,
+		AdvancedAccessWorkflows:    features.GetAdvancedAccessWorkflows(),
+		RecoveryCodes:              features.GetRecoveryCodes(),
+		Plugins:                    features.GetPlugins(),
+		AutomaticUpgrades:          features.GetAutomaticUpgrades(),
+		AccessGraph:                features.GetAccessGraph(),
+		AccessMonitoringConfigured: features.GetAccessMonitoringConfigured(),
+		AccessControls:             features.GetAccessControls(),
+		Assist:                     features.GetAssist(),
+		ProductType:                productType,
+	}
+}
+
 // ToProto converts Features into proto.Features
 func (f Features) ToProto() *proto.Features {
 	protoF := &proto.Features{

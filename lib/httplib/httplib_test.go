@@ -364,7 +364,7 @@ func TestSetIndexContentSecurityPolicy(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			h := make(http.Header)
-			SetIndexContentSecurityPolicy(h, tt.features, tt.urlPath)
+			SetIndexContentSecurityPolicy(h, tt.urlPath)
 			actualCsp := h.Get("Content-Security-Policy")
 			for k, v := range tt.expectedCspVals {
 				expectedCspSubString := fmt.Sprintf("%s %s;", k, v)
