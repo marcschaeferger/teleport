@@ -112,21 +112,6 @@ For more information on using `tsh`, see the [tsh reference](../connect-your-cli
 
 For more information on Teleport Connect, see [Using Teleport Connect](../connect-your-client/teleport-clients/teleport-connect.mdx).
 
-## Running Teleport services on macOS
-
-If you need to run Teleport services on macOS (such as for local development or running an agent), the PKG installer also includes the `teleport` daemon and `tbot`.
-
-| Binary | Description |
-| - | - |
-| `teleport` | The Teleport daemon for running cluster services or agents |
-| `tbot` | Machine ID client for workload identity |
-
-<Admonition type="note">
-
-Running Teleport services in production is typically done on Linux servers. macOS is primarily used for client access and local development. For production deployments, see [Installing Teleport on Linux](./linux.mdx).
-
-</Admonition>
-
 ### Install Teleport services
 
 If you haven't already, download and run the PKG installer:
@@ -135,12 +120,41 @@ If you haven't already, download and run the PKG installer:
 ```code
 $ curl -O https://cdn.teleport.dev/teleport-(=teleport.version=).pkg
 $ sudo installer -pkg teleport-(=teleport.version=).pkg -target /
+# Password
+# installer: Package name is teleport-(=teleport.version=)
+# installer: Upgrading at base path /
+# installer: The upgrade was successful.
+$ which teleport
+# /usr/local/bin/teleport
 ```
+
+## Running Teleport services on macOS
+
+The client tools above (`tsh`, `tctl`, Teleport Connect) are used to *connect to* a Teleport cluster on demand—you run them when you want to access a resource, 
+then they exit when you're done.
+
+Teleport *services* are different: they run continuously as background daemons. The `teleport` daemon can run cluster components (Auth Service, Proxy Service) 
+or agent services that enroll resources like servers, databases, or applications into your cluster. The `tbot` daemon provides machine identity for automated workloads.
+Most macOS users only need the client tools. You would install Teleport services on macOS primarily for:
+
+- Local development and testing of Teleport configurations
+- Running a Teleport agent to enroll your Mac as a resource in a cluster
+
+| Binary | Description |
+| - | - |
+| `teleport` | The Teleport daemon for running cluster services or agents |
+| `tbot` | Machine ID client for workload identity |
 
 ### Verify Teleport is installed
 ```code
 $ teleport version
 ```
+<Admonition type="note">
+
+Running Teleport services in production is typically done on Linux servers. 
+macOS is primarily used for client access and local development. For production deployments, see [Installing Teleport on Linux](./linux.mdx).
+
+</Admonition>
 
 For guidance on configuring and running Teleport, see:
 - [Deploy a Cluster](../zero-trust-access/deploy-a-cluster/deploy-a-cluster.mdx) for self-hosted deployments
