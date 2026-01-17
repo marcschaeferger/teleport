@@ -333,7 +333,7 @@ $ teleport version
 You should see output displaying the Teleport version number.
 
 Here are some troubleshooting tips:
-- If the repository cannot be found, verify the `ID` and `VERSION_CODENAME` variables match your distribution.
+- If the repository cannot be found, verify that for apt-based installations the `ID` and `VERSION_CODENAME` variables match your distribution, and for RPM-based installations the `ID` and `VERSION_ID` variables match your distribution.
 - For GPG key errors, ensure you downloaded the key to the correct location (`/etc/apt/keyrings/` for apt).
 - If packages are not found, check that `TELEPORT_CHANNEL` is set correctly and the repository URL is accessible.
 - For unsupported distributions, try setting `ID` to a compatible value from the supported distributions table (e.g., use `centos` for RHEL derivatives).
