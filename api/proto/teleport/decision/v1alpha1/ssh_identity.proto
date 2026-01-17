@@ -167,6 +167,9 @@ message SSHIdentity {
 
   // The scope associated with a host identity.
   string agent_scope = 36;
+
+  // The hash of the immutable labels assigned to the identity.
+  string immutable_label_hash = 37;
 }
 
 // CertExtensionMode specifies the type of extension to use in the cert. This type
