@@ -28,7 +28,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base32"
-	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -230,7 +229,7 @@ type Identity struct {
 
 	// ImmutableLabelHash is the hash of the immutable labels that have been
 	// applied to the identity.
-	ImmutableLabelHash []byte
+	ImmutableLabelHash string
 }
 
 // RouteToApp holds routing information for applications.
@@ -1037,11 +1036,11 @@ func (id *Identity) Subject() (pkix.Name, error) {
 		})
 	}
 
-	if id.ImmutableLabelHash != nil {
+	if id.ImmutableLabelHash != "" {
 		subject.ExtraNames = append(subject.ExtraNames,
 			pkix.AttributeTypeAndValue{
 				Type:  ImmutableLabelHashASN1ExtensionOID,
-				Value: hex.EncodeToString(id.ImmutableLabelHash),
+				Value: id.ImmutableLabelHash,
 			})
 	}
 
@@ -1325,12 +1324,7 @@ func FromSubject(subject pkix.Name, expires time.Time) (*Identity, error) {
 			}
 		case attr.Type.Equal(ImmutableLabelHashASN1ExtensionOID):
 			if val, ok := attr.Value.(string); ok {
-				hash, err := hex.DecodeString(val)
-				if err != nil {
-					return nil, trace.Wrap(err)
-				}
-
-				id.ImmutableLabelHash = hash
+				id.ImmutableLabelHash = val
 			}
 		}
 	}
