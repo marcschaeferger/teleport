@@ -56,6 +56,7 @@ import (
 	"github.com/gravitational/teleport/api/client/externalauditstorage"
 	gitserverclient "github.com/gravitational/teleport/api/client/gitserver"
 	kubewaitingcontainerclient "github.com/gravitational/teleport/api/client/kubewaitingcontainer"
+	"github.com/gravitational/teleport/api/client/linuxdesktop"
 	"github.com/gravitational/teleport/api/client/okta"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/client/scim"
@@ -87,6 +88,7 @@ import (
 	joinv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/join/v1"
 	kubeproto "github.com/gravitational/teleport/api/gen/proto/go/teleport/kube/v1"
 	kubewaitingcontainerpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/kubewaitingcontainer/v1"
+	linuxdesktopv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/linuxdesktop/v1"
 	loginrulepb "github.com/gravitational/teleport/api/gen/proto/go/teleport/loginrule/v1"
 	machineidv1pb "github.com/gravitational/teleport/api/gen/proto/go/teleport/machineid/v1"
 	notificationsv1pb "github.com/gravitational/teleport/api/gen/proto/go/teleport/notifications/v1"
@@ -3000,6 +3002,34 @@ func (c *Client) ListDynamicWindowsDesktops(ctx context.Context, pageSize int, p
 
 func (c *Client) GetDynamicWindowsDesktop(ctx context.Context, name string) (types.DynamicWindowsDesktop, error) {
 	return c.DynamicDesktopClient().GetDynamicWindowsDesktop(ctx, name)
+}
+
+// LinuxDesktopClient returns a LinuxDesktop client.
+// Clients connecting to older Teleport versions, still get a LinuxDesktop client
+// when calling this method, but all RPCs will return "not implemented" errors
+// (as per the default gRPC behavior).
+func (c *Client) LinuxDesktopClient() *linuxdesktop.Client {
+	return linuxdesktop.NewClient(linuxdesktopv1.NewLinuxDesktopServiceClient(c.conn))
+}
+
+func (c *Client) ListLinuxDesktops(ctx context.Context, pageSize int, pageToken string) ([]*linuxdesktopv1.LinuxDesktop, string, error) {
+	return c.LinuxDesktopClient().ListLinuxDesktops(ctx, pageSize, pageToken)
+}
+
+func (c *Client) GetLinuxDesktop(ctx context.Context, name string) (*linuxdesktopv1.LinuxDesktop, error) {
+	return c.LinuxDesktopClient().GetLinuxDesktop(ctx, name)
+}
+
+func (c *Client) CreateLinuxDesktop(ctx context.Context, linuxDesktop *linuxdesktopv1.LinuxDesktop) (*linuxdesktopv1.LinuxDesktop, error) {
+	return c.LinuxDesktopClient().CreateLinuxDesktop(ctx, linuxDesktop)
+}
+
+func (c *Client) UpdateLinuxDesktop(ctx context.Context, linuxDesktop *linuxdesktopv1.LinuxDesktop) (*linuxdesktopv1.LinuxDesktop, error) {
+	return c.LinuxDesktopClient().UpdateLinuxDesktop(ctx, linuxDesktop)
+}
+
+func (c *Client) UpsertLinuxDesktop(ctx context.Context, linuxDesktop *linuxdesktopv1.LinuxDesktop) (*linuxdesktopv1.LinuxDesktop, error) {
+	return c.LinuxDesktopClient().UpsertLinuxDesktop(ctx, linuxDesktop)
 }
 
 // ClusterConfigClient returns an unadorned Cluster Configuration client, using the underlying
