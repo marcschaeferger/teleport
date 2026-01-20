@@ -44,6 +44,8 @@ func Find(cfg Config) ([]string, error) {
 	// However, this is likely fast enough for most use cases.
 	packages.Visit(pkgs, nil, func(p *packages.Package) {
 		path := strings.TrimSuffix(p.PkgPath, ".test")
+		path = strings.TrimSuffix(path, "_test")
+
 		if matchesAnyPrefix(path, cfg.Excludes) {
 			return
 		}
