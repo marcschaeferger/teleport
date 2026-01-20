@@ -70,10 +70,7 @@ $ curl (=teleport.teleport_install_script_url=) | bash -s ${TELEPORT_VERSION?} $
 </TabItem>
 </Tabs>
 
-<Checkpoint
-  title="Verify cluster installation"
-  description="Confirm that Teleport binaries are installed and accessible from your terminal."
->
+### Verify cluster installation
 
 Run the following command to verify your installation:
 ```code
@@ -82,7 +79,11 @@ $ teleport version
 
 You should see output displaying the Teleport version number.
 
-Here are some troubleshooting tips:
+<Checkpoint
+  title="Troubleshoot cluster installation issues"
+  description="If the installation failed or teleport is not found, try these steps."
+>
+
 - If `teleport` is not found, ensure `/usr/local/bin` is in your `PATH` environment variable.
 - If the installation script fails, verify that `curl` is installed and your server has internet connectivity.
 - For permission errors, ensure you are running the script with appropriate privileges (use `sudo` if needed).
@@ -109,7 +110,7 @@ Outside of the Web UI, you can run our one-line cluster install script on your L
 
 1. Assign <Var name="example.teleport.sh:443"/> to your Teleport cluster hostname and Web UI port.
    This should contain your cluster hostname and port, but not the scheme (https://).
-2. Run your cluster's install script:
+1. Run your cluster's install script:
 ```code
    $ curl "https://<Var name="example.teleport.sh:443"/>/scripts/install.sh" | sudo bash
 ```
@@ -118,10 +119,7 @@ You can also use the example Terraform module for deploying agents in [Deploy
 Agents with
 Terraform](../zero-trust-access/infrastructure-as-code/terraform-provider/terraform-getting-started.mdx).
 
-<Checkpoint
-  title="Verify agent installation"
-  description="Confirm that the Teleport Agent is installed and running."
->
+### Verify agent installation
 
 Run the following commands to verify your agent installation:
 ```code
@@ -131,7 +129,11 @@ $ sudo systemctl status teleport
 
 You should see the Teleport version and a status showing the service is active and running.
 
-Here are some troubleshooting tips:
+<Checkpoint
+  title="Troubleshoot agent installation issues"
+  description="If the agent is not running or failed to start, try these steps."
+>
+
 - If the service is not running, start it with `sudo systemctl start teleport`.
 - If the service fails to start, check the logs with `journalctl -u teleport`.
 - Ensure the agent can reach your Teleport cluster over the network (check firewalls and security groups).
@@ -156,174 +158,176 @@ See the following guides for examples of setting up a configuration file:
 - [Teleport Configuration Reference](../reference/deployment/config.mdx): A guide to all
   configuration fields.
 
-## Other Install Methods
+## Other install methods
 
 ### Package repositories
 
-The [one-line-installation-script](#one-line-installation-script) automatically
+The [one-line installation script](#one-line-installation-script) automatically
 detects a package manager on the local system and uses it to install Teleport
 from an upstream repository.
 
 If your system does not support the one-line installation script, read the
-instructions in this section for instructions on working with Teleport package
-repositories.
+instructions in this section for working with Teleport package repositories.
 
 Note that Teleport Agents should always use the one-line installation script
 or `teleport-update` binary to install Teleport. Otherwise, they will fall
 out-of-date, become incompatible with the cluster, and eventually disconnect.
 
-1. Assign the following environment variables in the terminal where you will run
-   Teleport installation commands, indicating the package and version to
-   install:
+#### Step 1: Set environment variables
+
+Assign the following environment variables in the terminal where you will run
+Teleport installation commands, indicating the package and version to install:
 
 <Tabs>
-
-   <TabItem label="Teleport Enterprise (Self-Hosted)">
+<TabItem label="Teleport Enterprise (Self-Hosted)">
 ```code
-   $ export TELEPORT_PKG=teleport-ent
-   $ export TELEPORT_VERSION=v(=teleport.major_version=)
-   $ export TELEPORT_CHANNEL=stable/${TELEPORT_VERSION?}
+$ export TELEPORT_PKG=teleport-ent
+$ export TELEPORT_VERSION=v(=teleport.major_version=)
+$ export TELEPORT_CHANNEL=stable/${TELEPORT_VERSION?}
 ```
 
-   For FedRAMP/FIPS-compliant installations, install the `teleport-ent-fips` package instead:
+For FedRAMP/FIPS-compliant installations, install the `teleport-ent-fips` package instead:
 ```code
-   $ export TELEPORT_PKG=teleport-ent-fips
+$ export TELEPORT_PKG=teleport-ent-fips
 ```
 
-   </TabItem>
-   <TabItem label="Teleport Community Edition">
+</TabItem>
+<TabItem label="Teleport Community Edition">
 ```code
-   $ export TELEPORT_PKG=teleport
-   $ export TELEPORT_VERSION=v(=teleport.major_version=)
-   $ export TELEPORT_CHANNEL=stable/${TELEPORT_VERSION?}
+$ export TELEPORT_PKG=teleport
+$ export TELEPORT_VERSION=v(=teleport.major_version=)
+$ export TELEPORT_CHANNEL=stable/${TELEPORT_VERSION?}
 ```
 
-   </TabItem>
-   </Tabs>
+</TabItem>
+</Tabs>
 
-2. Teleport maintains DEB and RPM package repositories for different Linux
-   distributions based on variables defined in `/etc/os-release` on Linux
-   systems. Source this file to define the variables:
+#### Step 2: Source OS release variables
+
+Teleport maintains DEB and RPM package repositories for different Linux
+distributions based on variables defined in `/etc/os-release` on Linux
+systems. Source this file to define the variables:
 ```code
-   $ source /etc/os-release
+$ source /etc/os-release
 ```
 
-3. Make sure the value of the `ID` environment variable is supported.
+#### Step 3: Verify your distribution is supported
 
-   The Teleport DEB and RPM repositories don't expose packages for all
-   distribution variants. When installing Teleport using RPM repositories, you
-   may need to replace the `ID` variable set in `/etc/os-release` with `ID_LIKE`
-   to install packages of the closest supported distribution.
+Make sure the value of the `ID` environment variable is supported.
 
-   Currently supported distributions (and `ID` values) are:
+The Teleport DEB and RPM repositories don't expose packages for all
+distribution variants. When installing Teleport using RPM repositories, you
+may need to replace the `ID` variable set in `/etc/os-release` with `ID_LIKE`
+to install packages of the closest supported distribution.
 
-   | Distribution | Version              | `ID` value in `/etc/os-release` |
-   |--------------|----------------------|---------------------------------|
-   | Amazon Linux | 2 and 2023           | `amzn`                          |
-   | CentOS       | >= 7                 | `centos`                        |
-   | Debian       | >= 9                 | `debian`                        |
-   | RHEL         | >= 7                 | `rhel`                          |
-   | Rocky Linux  | >= 8                 | `rocky`                         |
-   | SLES         | >= 12 SP5, >= 15 SP5 | `sles`                          |
-   | Ubuntu       | >= 16.04             | `ubuntu`                        |
+Currently supported distributions (and `ID` values) are:
 
-   Note that [Enhanced Session
-   Recording](../enroll-resources/server-access/guides/bpf-session-recording.mdx) requires Linux
-   kernel version 5.8+. This means that it requires more recent OS versions than
-   other Teleport features:
+| Distribution | Version              | `ID` value in `/etc/os-release` |
+|--------------|----------------------|---------------------------------|
+| Amazon Linux | 2 and 2023           | `amzn`                          |
+| CentOS       | >= 7                 | `centos`                        |
+| Debian       | >= 9                 | `debian`                        |
+| RHEL         | >= 7                 | `rhel`                          |
+| Rocky Linux  | >= 8                 | `rocky`                         |
+| SLES         | >= 12 SP5, >= 15 SP5 | `sles`                          |
+| Ubuntu       | >= 16.04             | `ubuntu`                        |
 
-   | Distribution | Version                  |
-   |--------------|--------------------------|
-   | Amazon Linux | 2 (post 11/2021), 2023   |
-   | CentOS/RHEL  | 9+                       |
-   | Rocky Linux  | 8+                       |
-   | Debian       | 11, or 10 with backports |
-   | Ubuntu       | 20.04+                   |
+Note that [Enhanced Session
+Recording](../enroll-resources/server-access/guides/bpf-session-recording.mdx) requires Linux
+kernel version 5.8+. This means that it requires more recent OS versions than
+other Teleport features:
 
-   If the value of `ID` is not in the list above, look up the space-separated
-   values of the `ID_LIKE` variable you sourced from `/etc/os-release` and see
-   if one of them appears in the list.
+| Distribution | Version                  |
+|--------------|--------------------------|
+| Amazon Linux | 2 (post 11/2021), 2023   |
+| CentOS/RHEL  | 9+                       |
+| Rocky Linux  | 8+                       |
+| Debian       | 11, or 10 with backports |
+| Ubuntu       | 20.04+                   |
 
-4. Follow the instructions for your package manager:
+If the value of `ID` is not in the list above, look up the space-separated
+values of the `ID_LIKE` variable you sourced from `/etc/os-release` and see
+if one of them appears in the list.
+
+#### Step 4: Install Teleport
+
+Follow the instructions for your package manager:
 
 <Tabs>
-   <TabItem label="apt">
+<TabItem label="apt">
 ```code
-   $ sudo mkdir -p /etc/apt/keyrings
-   # Download the Teleport PGP public key
-   $ sudo curl https://apt.releases.teleport.dev/gpg \
-   -o /etc/apt/keyrings/teleport-archive-keyring.asc
-   # Add the Teleport APT repository. You'll need to update this file for each
-   # major release of Teleport.
-   $ echo "deb [signed-by=/etc/apt/keyrings/teleport-archive-keyring.asc] \
-   https://apt.releases.teleport.dev/${ID?} ${VERSION_CODENAME?} \
-   ${TELEPORT_CHANNEL?}" \
-   | sudo tee /etc/apt/sources.list.d/teleport.list > /dev/null
+$ sudo mkdir -p /etc/apt/keyrings
+# Download the Teleport PGP public key
+$ sudo curl https://apt.releases.teleport.dev/gpg \
+-o /etc/apt/keyrings/teleport-archive-keyring.asc
+# Add the Teleport APT repository. You'll need to update this file for each
+# major release of Teleport.
+$ echo "deb [signed-by=/etc/apt/keyrings/teleport-archive-keyring.asc] \
+https://apt.releases.teleport.dev/${ID?} ${VERSION_CODENAME?} \
+${TELEPORT_CHANNEL?}" \
+| sudo tee /etc/apt/sources.list.d/teleport.list > /dev/null
 
-   $ sudo apt-get update
-   $ sudo apt-get install ${TELEPORT_PKG?}
+$ sudo apt-get update
+$ sudo apt-get install ${TELEPORT_PKG?}
 ```
 
-   </TabItem>
-   <TabItem label="yum">
+</TabItem>
+<TabItem label="yum">
 ```code
-   # Add the Teleport YUM repository. You'll need to update this file for each
-   # major release of Teleport.
-   # First, get the major version from $VERSION_ID so this fetches the correct
-   # package version.
-   $ VERSION_ID=$(echo $VERSION_ID | grep -Eo "^[0-9]+")
-   $ sudo yum install -y yum-utils
-   $ sudo yum-config-manager --add-repo "$(rpm --eval "https://yum.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/${TELEPORT_CHANNEL?}/teleport.repo")"
-   $ sudo yum install ${TELEPORT_PKG?}
-   #
-   # Tip: Add /usr/local/bin to path used by sudo (so 'sudo tctl users add' will work as per the docs)
-   # echo "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin" > /etc/sudoers.d/secure_path
+# Add the Teleport YUM repository. You'll need to update this file for each
+# major release of Teleport.
+# First, get the major version from $VERSION_ID so this fetches the correct
+# package version.
+$ VERSION_ID=$(echo $VERSION_ID | grep -Eo "^[0-9]+")
+$ sudo yum install -y yum-utils
+$ sudo yum-config-manager --add-repo "$(rpm --eval "https://yum.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/${TELEPORT_CHANNEL?}/teleport.repo")"
+$ sudo yum install ${TELEPORT_PKG?}
+#
+# Tip: Add /usr/local/bin to path used by sudo (so 'sudo tctl users add' will work as per the docs)
+# echo "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin" > /etc/sudoers.d/secure_path
 ```
 
-   </TabItem>
-   <TabItem label="zypper">
+</TabItem>
+<TabItem label="zypper">
 ```code
-   # Add the Teleport Zypper repository. You'll need to update this file for each
-   # major release of Teleport.
-   # First, get the OS major version from $VERSION_ID so this fetches the correct
-   # package version.
-   $ VERSION_ID=$(echo $VERSION_ID | grep -Eo "^[0-9]+")
-   # Use zypper to add the teleport RPM repo
-   $ sudo zypper addrepo --refresh --repo $(rpm --eval "https://zypper.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/${TELEPORT_CHANNEL?}/teleport-zypper.repo")
-   $ sudo zypper --gpg-auto-import-keys refresh teleport
-   $ sudo zypper install ${TELEPORT_PKG?}
-   #
-   # Tip: Add /usr/local/bin to path used by sudo (so 'sudo tctl users add' will work as per the docs)
-   # echo "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin" > /etc/sudoers.d/secure_path
+# Add the Teleport Zypper repository. You'll need to update this file for each
+# major release of Teleport.
+# First, get the OS major version from $VERSION_ID so this fetches the correct
+# package version.
+$ VERSION_ID=$(echo $VERSION_ID | grep -Eo "^[0-9]+")
+# Use zypper to add the teleport RPM repo
+$ sudo zypper addrepo --refresh --repo $(rpm --eval "https://zypper.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/${TELEPORT_CHANNEL?}/teleport-zypper.repo")
+$ sudo zypper --gpg-auto-import-keys refresh teleport
+$ sudo zypper install ${TELEPORT_PKG?}
+#
+# Tip: Add /usr/local/bin to path used by sudo (so 'sudo tctl users add' will work as per the docs)
+# echo "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin" > /etc/sudoers.d/secure_path
 ```
 
-   </TabItem>
-   <TabItem label="dnf">
+</TabItem>
+<TabItem label="dnf">
 ```code
-   # Add the Teleport YUM repository for v(=teleport.major_version=). You'll need to update this
-   # file for each major release of Teleport.
-   # First, get the major version from $VERSION_ID so this fetches the correct
-   # package version.
-   $ VERSION_ID=$(echo $VERSION_ID | grep -Eo "^[0-9]+")
-   # Install dnf config-manager
-   $ sudo yum install -y yum-utils
-   # Use the dnf config manager plugin to add the teleport RPM repo
-   $ sudo dnf config-manager --add-repo "$(rpm --eval "https://yum.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/${TELEPORT_CHANNEL?}/teleport.repo")"
+# Add the Teleport YUM repository for v(=teleport.major_version=). You'll need to update this
+# file for each major release of Teleport.
+# First, get the major version from $VERSION_ID so this fetches the correct
+# package version.
+$ VERSION_ID=$(echo $VERSION_ID | grep -Eo "^[0-9]+")
+# Install dnf config-manager
+$ sudo yum install -y yum-utils
+# Use the dnf config manager plugin to add the teleport RPM repo
+$ sudo dnf config-manager --add-repo "$(rpm --eval "https://yum.releases.teleport.dev/$ID/$VERSION_ID/Teleport/%{_arch}/${TELEPORT_CHANNEL?}/teleport.repo")"
 
-   # Install teleport
-   $ sudo dnf install ${TELEPORT_PKG}
+# Install teleport
+$ sudo dnf install ${TELEPORT_PKG}
 
-   # Tip: Add /usr/local/bin to path used by sudo (so 'sudo tctl users add' will work as per the docs)
-   # echo "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin" > /etc/sudoers.d/secure_path
+# Tip: Add /usr/local/bin to path used by sudo (so 'sudo tctl users add' will work as per the docs)
+# echo "Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin" > /etc/sudoers.d/secure_path
 ```
 
-   </TabItem>
-   </Tabs>
+</TabItem>
+</Tabs>
 
-<Checkpoint
-  title="Verify package repository installation"
-  description="Confirm that Teleport was installed successfully from the package repository."
->
+### Verify package repository installation
 
 Run the following command to verify your installation:
 ```code
@@ -332,7 +336,11 @@ $ teleport version
 
 You should see output displaying the Teleport version number.
 
-Here are some troubleshooting tips:
+<Checkpoint
+  title="Troubleshoot package repository installation issues"
+  description="If the installation failed or packages were not found, try these steps."
+>
+
 - If the repository cannot be found, verify that for apt-based installations the `ID` and `VERSION_CODENAME` variables match your distribution, and for RPM-based installations the `ID` and `VERSION_ID` variables match your distribution.
 - For GPG key errors, ensure you downloaded the key to the correct location (`/etc/apt/keyrings/` for apt).
 - If packages are not found, check that `TELEPORT_CHANNEL` is set correctly and the repository URL is accessible.
@@ -350,126 +358,130 @@ Note that Teleport Agents should always use the one-line installation script
 or `teleport-update` binary to install Teleport. Otherwise, they will fall
 out-of-date, become incompatible with the cluster, and eventually disconnect.
 
-1. In your terminal, assign environment variables that you will use to download
-   your intended archive.
+#### Step 1: Set the package name
 
-   For Teleport Community Edition, the Teleport package is called `teleport`:
+In your terminal, assign environment variables that you will use to download
+your intended archive.
+
+For Teleport Community Edition, the Teleport package is called `teleport`:
 ```code
-   $ TELEPORT_PKG=teleport
+$ TELEPORT_PKG=teleport
 ```
 
-   For self-hosted Teleport Enterprise deployments, the package is called
-   `teleport-ent`:
+For self-hosted Teleport Enterprise deployments, the package is called
+`teleport-ent`:
 ```code
-   $ TELEPORT_PKG=teleport-ent
+$ TELEPORT_PKG=teleport-ent
 ```
 
-2. Specify your system Teleport version and system architecture by assigning an
-   environment variable:
+#### Step 2: Set version and architecture
+
+Specify your system Teleport version and system architecture by assigning an
+environment variable:
 ```code
-   $ TELEPORT_VERSION=(=teleport.version=)
-   $ SYSTEM_ARCH=""
+$ TELEPORT_VERSION=(=teleport.version=)
+$ SYSTEM_ARCH=""
 ```
 
-   The following architecture values are available:
+The following architecture values are available:
 
-   - `amd64` (`x86_64` if downloading an RPM package)
-   - `arm64`
-   - `arm`
-   - `386` (`i386` if downloading a DEB or RPM package)
+- `amd64` (`x86_64` if downloading an RPM package)
+- `arm64`
+- `arm`
+- `386` (`i386` if downloading a DEB or RPM package)
 
-3. Run the following commands to download a Teleport package or archive, unpack
-   it, and install binaries:
+#### Step 3: Download and install
+
+Run the following commands to download a Teleport package or archive, unpack
+it, and install binaries:
 
 <Tabs>
-   <TabItem label="TAR">
+<TabItem label="TAR">
 ```code
-   $ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz.sha256
-   $ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz
-   $ shasum --check --algorithm 256 < ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz.sha256
-   # ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz: OK
-   $ tar -xvf ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz
-   $ cd ${TELEPORT_PKG?}
-   $ sudo ./teleport-update enable --proxy example.teleport.sh # or sudo ./install for static installation
+$ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz.sha256
+$ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz
+$ shasum --check --algorithm 256 < ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz.sha256
+# ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz: OK
+$ tar -xvf ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-bin.tar.gz
+$ cd ${TELEPORT_PKG?}
+$ sudo ./teleport-update enable --proxy example.teleport.sh # or sudo ./install for static installation
 ```
 
-   </TabItem>
-   <TabItem label="DEB">
+</TabItem>
+<TabItem label="DEB">
 ```code
-   $ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb.sha256
-   $ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb
-   $ shasum --check --algorithm 256 < ${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb.sha256
-   # ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}.deb: OK
-   $ sudo dpkg -i ${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb
-   $ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
+$ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb.sha256
+$ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb
+$ shasum --check --algorithm 256 < ${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb.sha256
+# ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}.deb: OK
+$ sudo dpkg -i ${TELEPORT_PKG?}_${TELEPORT_VERSION?}_${SYSTEM_ARCH?}.deb
+$ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
 ```
 
-   </TabItem>
-   <TabItem label="RPM">
+</TabItem>
+<TabItem label="RPM">
 ```code
-   $ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm.sha256
-   $ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm
-   $ shasum --check --algorithm 256 < ${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm.sha256
-   # ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.deb: OK
-   $ shasum --check -a 256 https://cdn.teleport.dev/${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm
-   # Or use yum localinstall, dnf localinstall etc.
-   $ sudo rpm -i https://cdn.teleport.dev/${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm
-   $ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
+$ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm.sha256
+$ curl -O https://cdn.teleport.dev/${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm
+$ shasum --check --algorithm 256 < ${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm.sha256
+# ${TELEPORT_PKG?}-v${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm: OK
+# Or use yum localinstall, dnf localinstall etc.
+$ sudo rpm -i ${TELEPORT_PKG?}-${TELEPORT_VERSION?}-1.${SYSTEM_ARCH?}.rpm
+$ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
 ```
 
-   </TabItem>
-   </Tabs>
+</TabItem>
+</Tabs>
 
-   For FedRAMP/FIPS-compliant installations of Teleport Enterprise, package URLs
-   are slightly different:
+#### FIPS-compliant packages
 
-   <Tabs>
-   <TabItem label="TAR">
+For FedRAMP/FIPS-compliant installations of Teleport Enterprise, package URLs
+are slightly different:
+
+<Tabs>
+<TabItem label="TAR">
 ```code
-   $ curl -O https://cdn.teleport.dev/teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz.sha256
-   $ curl -O https://cdn.teleport.dev/teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz
-   $ shasum --check --algorithm 256 < teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz.sha256
-   # teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz: OK
-   $ tar -xvf teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz
-   $ cd teleport-ent
-   $ sudo ./teleport-update enable --proxy example.teleport.sh # or sudo ./install for static installation
+$ curl -O https://cdn.teleport.dev/teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz.sha256
+$ curl -O https://cdn.teleport.dev/teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz
+$ shasum --check --algorithm 256 < teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz.sha256
+# teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz: OK
+$ tar -xvf teleport-ent-v${TELEPORT_VERSION?}-linux-${SYSTEM_ARCH?}-fips-bin.tar.gz
+$ cd teleport-ent
+$ sudo ./teleport-update enable --proxy example.teleport.sh # or sudo ./install for static installation
 ```
 
-   </TabItem>
-   <TabItem label="DEB">
+</TabItem>
+<TabItem label="DEB">
 
-   FIPS builds are only available for the `arm64` and `amd64` system
-   architectures.
+FIPS builds are only available for the `arm64` and `amd64` system
+architectures.
 ```code
-   $ curl -O https://cdn.teleport.dev/teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb.sha256
-   $ curl -O https://cdn.teleport.dev/teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb
-   $ shasum --check --algorithm 256 < teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb.sha256
-   # teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb: OK
-   $ sudo dpkg -i teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb
-   $ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
+$ curl -O https://cdn.teleport.dev/teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb.sha256
+$ curl -O https://cdn.teleport.dev/teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb
+$ shasum --check --algorithm 256 < teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb.sha256
+# teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb: OK
+$ sudo dpkg -i teleport-ent_${TELEPORT_VERSION}-fips_${SYSTEM_ARCH}.deb
+$ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
 ```
 
-   </TabItem>
-   <TabItem label="RPM">
+</TabItem>
+<TabItem label="RPM">
 
-   FIPS builds are only available for the `arm64` and `x86_64` system
-   architectures.
+FIPS builds are only available for the `arm64` and `x86_64` system
+architectures.
 ```code
-   $ curl -O https://cdn.teleport.dev/teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm.sha256
-   $ curl -O https://cdn.teleport.dev/teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm
-   $ shasum --check --algorithm 256 < teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm.sha256
-   # Or use yum localinstall, dnf localinstall etc.
-   $ sudo rpm -i https://cdn.teleport.dev/teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm
-   $ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
+$ curl -O https://cdn.teleport.dev/teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm.sha256
+$ curl -O https://cdn.teleport.dev/teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm
+$ shasum --check --algorithm 256 < teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm.sha256
+# Or use yum localinstall, dnf localinstall etc.
+$ sudo rpm -i teleport-ent-${TELEPORT_VERSION?}-1-fips.${SYSTEM_ARCH?}.rpm
+$ sudo teleport-update enable --proxy example.teleport.sh # enable Managed Updates
 ```
 
-   </TabItem>
-   </Tabs>
+</TabItem>
+</Tabs>
 
-<Checkpoint
-  title="Verify manual installation"
-  description="Confirm that Teleport was installed successfully from the downloaded package or archive."
->
+### Verify manual installation
 
 Run the following command to verify your installation:
 ```code
@@ -478,7 +490,11 @@ $ teleport version
 
 You should see output displaying the Teleport version number.
 
-Here are some troubleshooting tips:
+<Checkpoint
+  title="Troubleshoot manual installation issues"
+  description="If the installation failed or teleport is not found, try these steps."
+>
+
 - If the checksum verification fails, re-download the package and SHA256 file as the download may have been corrupted.
 - If `teleport` is not found after TAR installation, ensure you ran the `./install` script or added the binary location to your `PATH`.
 - For dependency errors with DEB packages, run `sudo apt-get install -f` to resolve missing dependencies.
