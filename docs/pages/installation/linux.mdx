@@ -84,10 +84,17 @@ You should see output displaying the Teleport version number.
   description="If the installation failed or teleport is not found, try these steps."
 >
 
-- If `teleport` is not found, ensure `/usr/local/bin` is in your `PATH` environment variable.
-- If the installation script fails, verify that `curl` is installed and your server has internet connectivity.
-- For permission errors, ensure you are running the script with appropriate privileges (use `sudo` if needed).
-- If systemd is not installed, you may need to use a TAR archive installation instead.
+- If `teleport` is not found, ensure `/usr/local/bin` is included in your `PATH`.
+- If the service is not running, start it with:
+  ```bash
+  sudo systemctl start teleport
+  ```
+- Check logs for startup errors:
+  ```bash
+  sudo journalctl -u teleport --no-pager
+  ```
+- Ensure the host has outbound internet access during installation.
+- If systemd is not available, use a TAR archive installation instead.
 
 </Checkpoint>
 
@@ -134,11 +141,23 @@ You should see the Teleport version and a status showing the service is active a
   description="If the agent is not running or failed to start, try these steps."
 >
 
-- If the service is not running, start it with `sudo systemctl start teleport`.
-- If the service fails to start, check the logs with `journalctl -u teleport`.
-- Ensure the agent can reach your Teleport cluster over the network (check firewalls and security groups).
-- Verify that the join token is valid and has not expired.
-- For SELinux-enabled systems, check if SELinux is blocking Teleport with `ausearch -m avc -ts recent`.
+- Start the service if it is not running:
+  ```bash
+  sudo systemctl start teleport
+  ```
+- Check logs:
+  ```bash
+  journalctl -u teleport --no-pager
+  ```
+- Verify the join token is valid and unexpired.
+- Ensure the agent can reach the Teleport Proxy (firewalls, security groups).
+- Ensure system time is synchronized (for example, using `chronyd` or `systemd-timesyncd`).  
+  Clock skew can prevent agents from joining.
+- On SELinux systems, check for denied operations:
+  ```bash
+  ausearch -m avc -ts recent
+  ```
+- If your environment uses outbound TLS inspection or proxies, ensure Teleport traffic is not intercepted.
 
 </Checkpoint>
 
@@ -341,10 +360,10 @@ You should see output displaying the Teleport version number.
   description="If the installation failed or packages were not found, try these steps."
 >
 
-- If the repository cannot be found, verify that for apt-based installations the `ID` and `VERSION_CODENAME` variables match your distribution, and for RPM-based installations the `ID` and `VERSION_ID` variables match your distribution.
-- For GPG key errors, ensure you downloaded the key to the correct location (`/etc/apt/keyrings/` for apt).
-- If packages are not found, check that `TELEPORT_CHANNEL` is set correctly and the repository URL is accessible.
-- For unsupported distributions, try setting `ID` to a compatible value from the supported distributions table (e.g., use `centos` for RHEL derivatives).
+- Verify `ID`, `VERSION_ID`, and `VERSION_CODENAME` in `/etc/os-release`.
+- For apt-based systems, ensure the GPG key exists in `/etc/apt/keyrings/`.
+- Verify the correct `TELEPORT_CHANNEL` is configured.
+- If `teleport` or `tctl` works without `sudo` but fails with it, ensure `/usr/local/bin` is included in sudo’s secure path.
 
 </Checkpoint>
 
@@ -495,12 +514,21 @@ You should see output displaying the Teleport version number.
   description="If the installation failed or teleport is not found, try these steps."
 >
 
-- If the checksum verification fails, re-download the package and SHA256 file as the download may have been corrupted.
-- If `teleport` is not found after TAR installation, ensure you ran the `./install` script or added the binary location to your `PATH`.
-- For dependency errors with DEB packages, run `sudo apt-get install -f` to resolve missing dependencies.
-- For dependency errors with RPM packages, use `yum localinstall` or `dnf localinstall` instead of `rpm -i` to automatically resolve dependencies.
-- Verify the `SYSTEM_ARCH` variable matches your system architecture (`uname -m` to check).
-
+- Re-download packages if checksum verification fails.
+- Ensure the install script was executed for TAR installs.
+- Resolve dependency issues using:
+  - `apt-get install -f`
+  - `yum localinstall`
+  - `dnf localinstall`
+- After enabling managed updates:
+  ```bash
+  teleport-update enable
+  sudo systemctl start teleport
+  ```
+- Ensure the package architecture matches:
+  ```bash
+  uname -m
+  ```
 </Checkpoint>
 
 ### From your browser
