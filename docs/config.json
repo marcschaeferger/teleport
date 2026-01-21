@@ -437,7 +437,7 @@
     },
     {
       "source": "/admin-guides/access-controls/access-requests/access-request-configuration/",
-      "destination": "/identity-governance/access-requests/access-request-configuration/",
+      "destination": "/identity-governance/access-requests/configuration/",
       "permanent": true
     },
     {
@@ -3475,6 +3475,11 @@
     {
       "source": "/enroll-resources/application-access/introduction/",
       "destination": "/enroll-resources/application-access/getting-started/",
+      "permanent": true
+    },
+    {
+      "source": "/identity-governance/access-requests/access-request-configuration/",
+      "destination": "/identity-governance/access-requests/configuration/",
       "permanent": true
     }
   ]
