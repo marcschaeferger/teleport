@@ -28,6 +28,7 @@ import (
 	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/types"
 	dtconfig "github.com/gravitational/teleport/lib/devicetrust/config"
+	"github.com/gravitational/teleport/lib/modules"
 	"github.com/gravitational/teleport/lib/sshca"
 	"github.com/gravitational/teleport/lib/tlsca"
 )
@@ -93,7 +94,7 @@ func VerifySSHUser(ctx context.Context, dt *types.DeviceTrust, ident *sshca.Iden
 }
 
 func verifyDeviceExtensions(ctx context.Context, dt *types.DeviceTrust, username string, isBot bool, verified bool) error {
-	mode := dtconfig.GetEnforcementMode(dt)
+	mode := dtconfig.GetEnforcementMode(dt, modules.GetModules())
 
 	var pass bool
 	switch mode {
