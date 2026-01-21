@@ -147,7 +147,7 @@ You should see the Teleport version and a status showing the service is active a
   ```
 - Check logs:
   ```bash
-  journalctl -u teleport --no-pager
+  sudo journalctl -u teleport --no-pager
   ```
 - Verify the join token is valid and unexpired.
 - Ensure the agent can reach the Teleport Proxy (firewalls, security groups).
