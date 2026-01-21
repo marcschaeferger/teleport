@@ -22,6 +22,7 @@ import {
   CirclePlay,
   ClipboardUser,
   Cluster,
+  Download,
   Integrations as IntegrationsIcon,
   Key,
   Laptop,
@@ -66,6 +67,7 @@ import { Integrations } from './Integrations';
 import { JoinTokens } from './JoinTokens/JoinTokens';
 import { Locks } from './LocksV2/Locks';
 import { NewLockView } from './LocksV2/NewLock';
+import { ManagedUpdates } from './ManagedUpdates';
 import { RolesContainer as Roles } from './Roles';
 import { SessionsContainer as Sessions } from './Sessions';
 import { Support } from './Support';
@@ -644,6 +646,39 @@ export class FeatureIntegrationEnroll implements TeleportFeature {
   }
 }
 
+export class FeatureManagedUpdates implements TeleportFeature {
+  category = NavigationCategory.ZeroTrustAccess;
+
+  route = {
+    title: 'Managed Updates',
+    path: cfg.routes.managedUpdates,
+    exact: true,
+    component: ManagedUpdates,
+  };
+
+  hasAccess(flags: FeatureFlags) {
+    // If feature hiding is enabled, only show if the user at least has access to read the rollout resource.
+    if (shouldHideFromNavigation(cfg)) {
+      return flags.readAutoUpdateAgentRollout;
+    }
+    return true;
+  }
+
+  navigationItem = {
+    title: NavTitle.ManagedUpdates,
+    icon: Download,
+    exact: true,
+    getLink() {
+      return cfg.getManagedUpdatesRoute();
+    },
+    searchableTags: ['managed updates', 'updates', 'rollout', 'agents'],
+  };
+
+  getRoute() {
+    return this.route;
+  }
+}
+
 // - Activity
 
 export class FeatureRecordings implements TeleportFeature {
@@ -916,6 +951,7 @@ export function getOSSFeatures(): TeleportFeature[] {
     new FeatureRoles(),
     new FeatureAuthConnectors(),
     new FeatureIntegrations(),
+    new FeatureManagedUpdates(),
     new FeatureClusters(),
     new FeatureTrust(),
     new FeatureIntegrationStatus(),

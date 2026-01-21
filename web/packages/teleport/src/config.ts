@@ -228,6 +228,7 @@ const cfg = {
     requests: '/web/requests/:requestId?',
 
     downloadCenter: '/web/downloads',
+    managedUpdates: '/web/managed-updates',
 
     // sso routes
     ssoConnector: {
@@ -551,6 +552,11 @@ const cfg = {
         '/v1/webapi/sites/:clusterId/sessionrecording/:sessionId/playback/ws',
       thumbnail: '/v1/webapi/sites/:clusterId/sessionthumbnail/:sessionId',
     },
+
+    managedUpdates: {
+      details: '/v1/webapi/managed-updates',
+      groupAction: '/v1/webapi/managed-updates/groups/:groupName/:action',
+    },
   },
 
   playable_db_protocols: [],
@@ -711,6 +717,24 @@ const cfg = {
 
   getAuditRoute(clusterId: string) {
     return generatePath(cfg.routes.audit, { clusterId });
+  },
+
+  getManagedUpdatesRoute() {
+    return cfg.routes.managedUpdates;
+  },
+
+  getManagedUpdatesUrl() {
+    return cfg.api.managedUpdates.details;
+  },
+
+  getManagedUpdatesGroupActionUrl(
+    groupName: string,
+    action: 'start' | 'done' | 'rollback'
+  ) {
+    return generatePath(cfg.api.managedUpdates.groupAction, {
+      groupName,
+      action,
+    });
   },
 
   /**

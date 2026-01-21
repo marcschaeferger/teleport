@@ -44,7 +44,12 @@ export const InfoGuideSidePanel = () => {
       slideFrom="right"
     >
       <InfoGuideContainer
-        onClose={() => setInfoGuideConfig(null)}
+        onClose={() => {
+          if (infoGuideConfig?.onClose) {
+            infoGuideConfig.onClose();
+          }
+          setInfoGuideConfig(null);
+        }}
         title={infoGuideConfig?.title}
       >
         {infoGuideConfig?.guide}
