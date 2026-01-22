@@ -656,6 +656,8 @@ type Config struct {
 	Trust services.Trust
 	// ClusterConfig is a cluster configuration service
 	ClusterConfig services.ClusterConfiguration
+	// StaticScopedToken manages the cluster's static scoped tokens.
+	StaticScopedToken services.StaticScopedTokenService
 	// AutoUpdateService is an autoupdate service.
 	AutoUpdateService services.AutoUpdateServiceGetter
 	// Provisioner is a provisioning service

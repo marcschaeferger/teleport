@@ -194,7 +194,7 @@ func setupCollections(c Config) (*collections, error) {
 			out.staticTokens = collect
 			out.byKind[resourceKind] = out.staticTokens
 		case types.KindStaticScopedTokens:
-			collect, err := newStaticScopedTokensCollection(c.ClusterConfig, watch)
+			collect, err := newStaticScopedTokensCollection(c.StaticScopedToken, watch)
 			if err != nil {
 				return nil, trace.Wrap(err)
 			}

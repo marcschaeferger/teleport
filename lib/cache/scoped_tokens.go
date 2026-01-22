@@ -32,9 +32,9 @@ type staticScopedTokensIndex string
 
 const staticScopedTokensNameIndex staticScopedTokensIndex = "name"
 
-func newStaticScopedTokensCollection(upstream services.ClusterConfiguration, w types.WatchKind) (*collection[*joiningv1.StaticScopedTokens, staticScopedTokensIndex], error) {
+func newStaticScopedTokensCollection(upstream services.StaticScopedTokenService, w types.WatchKind) (*collection[*joiningv1.StaticScopedTokens, staticScopedTokensIndex], error) {
 	if upstream == nil {
-		return nil, trace.BadParameter("missing parameter ClusterConfig")
+		return nil, trace.BadParameter("missing parameter StaticScopedTokenService")
 	}
 
 	return &collection[*joiningv1.StaticScopedTokens, staticScopedTokensIndex]{
@@ -74,7 +74,7 @@ func (c *Cache) GetStaticScopedTokens(ctx context.Context) (*joiningv1.StaticSco
 		collection: c.collections.staticScopedTokens,
 		index:      staticScopedTokensNameIndex,
 		upstreamGet: func(ctx context.Context, ident string) (*joiningv1.StaticScopedTokens, error) {
-			tokens, err := c.Config.ClusterConfig.GetStaticScopedTokens(ctx)
+			tokens, err := c.Config.StaticScopedToken.GetStaticScopedTokens(ctx)
 			return tokens, trace.Wrap(err)
 		},
 	}

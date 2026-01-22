@@ -141,6 +141,7 @@ type ClusterConfiguration interface {
 // auth-specific methods.
 type ClusterConfigurationInternal interface {
 	ClusterConfiguration
+	StaticScopedTokenService
 
 	// SetClusterName sets services.ClusterName on the backend.
 	SetClusterName(types.ClusterName) error
@@ -156,6 +157,11 @@ type ClusterConfigurationInternal interface {
 	// applied should be the same backend used by the
 	// ClusterConfigurationInternal.
 	AppendCheckAuthPreferenceActions(actions []backend.ConditionalAction, revision string) ([]backend.ConditionalAction, error)
+}
+
+// StaticScopedTokenService is the interface for interacting with the cluster's
+// [*joiningv1.StaticScopedTokens].
+type StaticScopedTokenService interface {
 	// GetStaticScopedTokens gets [*joiningv1.StaticScopedTokens] from the backend.
 	GetStaticScopedTokens(context.Context) (*joiningv1.StaticScopedTokens, error)
 	// SetStaticScopedTokens sets [*joiningv1.StaticScopedTokens] to the backend.
