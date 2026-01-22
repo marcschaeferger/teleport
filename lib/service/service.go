@@ -2478,6 +2478,7 @@ func (process *TeleportProcess) initAuthService() error {
 				Inventory:          as.Services,
 				BotInstanceBackend: as.Services,
 				Logger:             process.logger.With(teleport.ComponentKey, "inventory.cache"),
+				Registerer:         process.metricsRegistry,
 			})
 			if err != nil {
 				return trace.Wrap(err, "creating inventory cache")
