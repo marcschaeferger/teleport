@@ -1117,6 +1117,7 @@ func (t StaticScopedTokens) Parse() (*joiningv1.StaticScopedTokens, error) {
 				Roles:         roles.StringSlice(),
 				AssignedScope: st.Scope,
 				JoinMethod:    string(types.JoinMethodToken),
+				UsageMode:     string(joining.TokenUsageModeUnlimited),
 			},
 			Status: &joiningv1.ScopedTokenStatus{
 				Secret: st.Secret,

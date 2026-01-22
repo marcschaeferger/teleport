@@ -44,6 +44,7 @@ import (
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/modules"
 	"github.com/gravitational/teleport/lib/modules/modulestest"
+	"github.com/gravitational/teleport/lib/scopes/joining"
 	"github.com/gravitational/teleport/lib/service/servicecfg"
 	"github.com/gravitational/teleport/lib/sshutils/x11"
 )
@@ -625,6 +626,7 @@ teleport:
 						Roles:         []string{string(types.RoleNode)},
 						AssignedScope: "/test",
 						JoinMethod:    string(types.JoinMethodToken),
+						UsageMode:     string(joining.TokenUsageModeUnlimited),
 					},
 					Status: &joiningv1.ScopedTokenStatus{
 						Secret: "secret_token_value",
@@ -655,6 +657,7 @@ teleport:
 						Roles:         []string{string(types.RoleNode)},
 						AssignedScope: "/test",
 						JoinMethod:    string(types.JoinMethodToken),
+						UsageMode:     string(joining.TokenUsageModeUnlimited),
 					},
 					Status: &joiningv1.ScopedTokenStatus{
 						Secret: "secret_token_value",
@@ -704,6 +707,7 @@ teleport:
 						Roles:         []string{string(types.RoleNode)},
 						AssignedScope: "/test",
 						JoinMethod:    string(types.JoinMethodToken),
+						UsageMode:     string(joining.TokenUsageModeUnlimited),
 					},
 					Status: &joiningv1.ScopedTokenStatus{
 						Secret: "secret_token_value",
@@ -721,6 +725,7 @@ teleport:
 						Roles:         []string{string(types.RoleNode)},
 						AssignedScope: "/test",
 						JoinMethod:    string(types.JoinMethodToken),
+						UsageMode:     string(joining.TokenUsageModeUnlimited),
 					},
 					Status: &joiningv1.ScopedTokenStatus{
 						Secret: "secret_token_value",
