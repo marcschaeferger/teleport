@@ -100,10 +100,12 @@ func (idl *ResourceAccessIDList) CheckAndSetDefaults() error {
 	return nil
 }
 
+// GetResourceID returns the wrapped [ResourceID] from the [ResourceAccessID]
 func (r *ResourceAccessID) GetResourceID() ResourceID {
 	return r.Id
 }
 
+// GetConstraints returns any [ResourceConstraints] present on the [ResourceAccessID]
 func (r *ResourceAccessID) GetConstraints() *ResourceConstraints {
 	return r.Constraints
 }
@@ -303,12 +305,21 @@ const (
 	ResourceIDSentinelValue = "__SENTINEL__"
 )
 
-// CreateSentinelResourceID creates a [ResourceID] that acts as a sentinel value
-// or placeholder, indicating the absence of a real resource ID.
+// CreateSentinelResourceID returns a [ResourceID] that does not refer to any
+// real resource.
 //
-// This is necessary when handling requests/certs containing only [ResourceAccessID] s,
-// as an empty list of [types.AccessRequest.AllowedResourceIDs] is interpreted as
-// "no resource-specific restrictions".
+// In mixed-version clusters, some authorization paths (e.g., older Auth) may not parse
+// AllowedResourceAccessIDs from identities. In those paths, an empty
+// AllowedResourceIDs slice is interpreted by AccessChecker as "no resource-specific restrictions".
+//
+// When an identity is resource-scoped exclusively via AllowedResourceAccessIDs, AllowedResourceIDs
+// would otherwise be empty. To prevent those authorization paths from interpreting this as
+// unconstrained, this sentinel value is injected into AllowedResourceIDs so authorization fails closed.
+//
+// Any code that understands AllowedResourceAccessIDs must remove or ignore this
+// sentinel before evaluating resource restrictions or returning ResourceIDs to clients.
+//
+// TODO(kiosion): DELETE in 21.0.0
 func CreateSentinelResourceID() ResourceID {
 	return ResourceID{
 		ClusterName: ResourceIDSentinelValue,
@@ -317,8 +328,11 @@ func CreateSentinelResourceID() ResourceID {
 	}
 }
 
-// IsSentinelResourceID checks whether the given [ResourceID] is a sentinel value
-// created by [CreateSentinelResourceID].
+// IsSentinelResourceID reports whether the given [ResourceD] is a sentinel produced by
+// [CreateSentinelResourceID]. See [CreateSentinelResourceID] for the rationale and required
+// handling.
+//
+// TODO(kiosion): DELETE in 21.0.0
 func IsSentinelResourceID(id ResourceID) bool {
 	return id.ClusterName == ResourceIDSentinelValue &&
 		id.Kind == KindNode &&
