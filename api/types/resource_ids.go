@@ -17,13 +17,11 @@ limitations under the License.
 package types
 
 import (
-	"encoding/ascii85"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/gravitational/trace"
 )
 
@@ -219,30 +217,37 @@ func ResourceIDFromString(raw string) (ResourceID, error) {
 }
 
 // ResourceAccessIDsToString serializes a list of ResourceAccessIDs
-// to an ascii85-encoded string of [ResourceAccessIDList] protobuf bytes.
+// to a JSON string.
 func ResourceAccessIDsToString(ids []ResourceAccessID) (string, error) {
-	b, err := proto.Marshal(&ResourceAccessIDList{Resources: ids})
-	if err != nil {
-		return "", trace.Wrap(err)
+	if len(ids) == 0 {
+		return "", nil
 	}
-	enc := make([]byte, ascii85.MaxEncodedLen(len(b)))
-	n := ascii85.Encode(enc, b)
-	return string(enc[:n]), nil
+
+	bytes, err := json.Marshal(&ResourceAccessIDList{Resources: ids})
+	if err != nil {
+		return "", trace.BadParameter("failed to marshal ResourceAccessIDs to JSON: %v", err)
+	}
+
+	return string(bytes), nil
 }
 
 // ResourceAccessIDsFromString deserializes a list of ResourceAccessIDs
-// from an ascii85-encoded string of [ResourceAccessIDList] protobuf bytes.
+// from a JSON string.
 func ResourceAccessIDsFromString(raw string) ([]ResourceAccessID, error) {
-	dec := make([]byte, len(raw))
-	n, _, err := ascii85.Decode(dec, []byte(raw), true)
-	if err != nil {
-		return nil, trace.Wrap(err, "decoding ResourceAccessIDList from string")
+	var resourceAccessIDList ResourceAccessIDList
+
+	if raw == "" {
+		return resourceAccessIDList.Resources, nil
 	}
-	var IDList ResourceAccessIDList
-	if err := proto.Unmarshal(dec[:n], &IDList); err != nil {
-		return nil, trace.Wrap(err, "unmarshalling ResourceAccessIDList from string")
+	if err := json.Unmarshal([]byte(raw), &resourceAccessIDList); err != nil {
+		return nil, trace.BadParameter("failed to unmarshal ResourceAccessIDs from JSON: %v", err)
 	}
-	return IDList.Resources, trace.Wrap(IDList.CheckAndSetDefaults())
+
+	if err := resourceAccessIDList.CheckAndSetDefaults(); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return resourceAccessIDList.Resources, nil
 }
 
 // ResourceIDsFromStrings parses a list of ResourceIDs from a list of strings.
