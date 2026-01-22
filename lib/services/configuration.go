@@ -45,18 +45,10 @@ type ClusterConfiguration interface {
 
 	// GetStaticTokens gets services.StaticTokens from the backend.
 	GetStaticTokens(context.Context) (types.StaticTokens, error)
-	// GetStaticScopedTokens gets [*joiningv1.StaticScopedTokens] from the backend.
-	GetStaticScopedTokens(context.Context) (*joiningv1.StaticScopedTokens, error)
 	// SetStaticTokens sets services.StaticTokens on the backend.
 	SetStaticTokens(types.StaticTokens) error
-	// SetStaticScopedTokens sets [*joiningv1.StaticScopedTokens] to the backend.
-	SetStaticScopedTokens(context.Context, *joiningv1.StaticScopedTokens) error
 	// DeleteStaticTokens deletes static tokens resource
 	DeleteStaticTokens() error
-	// DeleteStaticScopedTokens deletes the [*joiningv1.StaticScopedTokens] resource resource
-	// from the backend
-	DeleteStaticScopedTokens(context.Context) error
-
 	// GetUIConfig gets the proxy service UI config from the backend
 	GetUIConfig(context.Context) (types.UIConfig, error)
 	// SetUIConfig sets the proxy service UI config from the backend
@@ -164,6 +156,13 @@ type ClusterConfigurationInternal interface {
 	// applied should be the same backend used by the
 	// ClusterConfigurationInternal.
 	AppendCheckAuthPreferenceActions(actions []backend.ConditionalAction, revision string) ([]backend.ConditionalAction, error)
+	// GetStaticScopedTokens gets [*joiningv1.StaticScopedTokens] from the backend.
+	GetStaticScopedTokens(context.Context) (*joiningv1.StaticScopedTokens, error)
+	// SetStaticScopedTokens sets [*joiningv1.StaticScopedTokens] to the backend.
+	SetStaticScopedTokens(context.Context, *joiningv1.StaticScopedTokens) error
+	// DeleteStaticScopedTokens deletes the [*joiningv1.StaticScopedTokens] resource resource
+	// from the backend
+	DeleteStaticScopedTokens(context.Context) error
 }
 
 // ValidateAuthPreference performs checks that should happen before persisting a
