@@ -65,6 +65,9 @@ type AccessChecker interface {
 	// CheckAccess checks access to the specified resource.
 	CheckAccess(r AccessCheckable, state AccessState, matchers ...RoleMatcher) error
 
+	// CheckConditionalAccess checks conditional access to the specified resource.
+	CheckConditionalAccess(r AccessCheckable, state AccessState, matchers ...RoleMatcher) ([]*decisionpb.Precondition, error)
+
 	// CheckDeviceAccess verifies if the current device state satisfies the
 	// device trust requirements of the user's RoleSet.
 	CheckDeviceAccess(state AccessState) error
@@ -532,11 +535,22 @@ func (a *accessChecker) AccessInfo() *AccessInfo {
 	return a.info
 }
 
-// CheckAccess checks if the identity for this AccessChecker has access to the
-// given resource.
+// CheckAccess checks if the identity for this AccessChecker has access to the given resource.
 func (a *accessChecker) CheckAccess(r AccessCheckable, state AccessState, matchers ...RoleMatcher) error {
-	if err := a.checkAllowedResources(r); err != nil {
+	// Set ReturnPreconditions to false to always returns an error if access should be denied.
+	state.ReturnPreconditions = false
+
+	if _, err := a.CheckConditionalAccess(r, state, matchers...); err != nil {
 		return trace.Wrap(err)
+	}
+
+	return nil
+}
+
+// CheckConditionalAccess checks if the identity for this AccessChecker has conditional access to the given resource.
+func (a *accessChecker) CheckConditionalAccess(r AccessCheckable, state AccessState, matchers ...RoleMatcher) ([]*decisionpb.Precondition, error) {
+	if err := a.checkAllowedResources(r); err != nil {
+		return nil, trace.Wrap(err)
 	}
 
 	switch rr := r.(type) {
@@ -546,7 +560,12 @@ func (a *accessChecker) CheckAccess(r AccessCheckable, state AccessState, matche
 		matchers = append(matchers, NewIdentityCenterAccountAssignmentMatcher(rr.UnwrapT()))
 	}
 
-	return trace.Wrap(a.RoleSet.checkAccess(r, a.info.Traits, state, matchers...))
+	preconds, err := a.checkConditionalAccess(r, a.info.Traits, state, matchers...)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return preconds, nil
 }
 
 // CheckAccessToSAMLIdP checks access to SAML IdP service provider resource.

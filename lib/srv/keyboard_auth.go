@@ -21,6 +21,7 @@ package srv
 import (
 	"context"
 	"os"
+	"slices"
 
 	"github.com/gravitational/trace"
 	"golang.org/x/crypto/ssh"
@@ -55,19 +56,35 @@ func (h *AuthHandlers) KeyboardInteractiveAuth(
 	// authentication. Therefore, we will set up both callbacks and let the SSH server decide which one to invoke based
 	// on what the client supports.
 
-	// legacyPublicKeyCallback allows a legacy client to proceed with just public key authentication, skipping
-	// keyboard-interactive authentication altogether. By default, we allow this for backward compatibility. However, if
-	// the TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA environment variable is set to "yes", we disable this callback to enforce
-	// keyboard-interactive authentication only (see RFD 0234).
+	// legacyPublicKeyCallback allows a legacy client to proceed with just public key authentication for backwards
+	// compatibility, skipping keyboard-interactive authentication altogether.
 	//
 	// TODO(cthach): Remove in v20.0 and only set KeyboardInteractiveCallback.
 	legacyPublicKeyCallback := func(_ ssh.ConnMetadata, _ ssh.PublicKey) (*ssh.Permissions, error) {
-		return perms, nil
-	}
-	if os.Getenv("TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA") == "yes" {
-		legacyPublicKeyCallback = func(_ ssh.ConnMetadata, _ ssh.PublicKey) (*ssh.Permissions, error) {
-			return nil, trace.AccessDenied(`Legacy public key authentication is forbidden (TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA = "yes")`)
+		if os.Getenv("TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA") == "yes" {
+			return nil, trace.AccessDenied(`legacy public key authentication is forbidden (TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA = "yes")`)
 		}
+
+		// If MFA was not verified, it means we're dealing with a regular SSH certificate. If MFA was already verified,
+		// it means we're dealing with a per-session MFA certificate.
+		isRegularSSHCert := id.MFAVerified == "" && !id.PrivateKeyPolicy.MFAVerified()
+
+		// Determine if MFA is required based on the provided preconditions.
+		mfaRequired := slices.ContainsFunc(
+			preconds,
+			func(p *decisionpb.Precondition) bool {
+				return p.GetKind() == decisionpb.PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA
+			},
+		)
+
+		// If MFA is required, only per-session MFA certificates are allowed. If MFA is not required, any certificate is
+		// allowed.
+		if mfaRequired && isRegularSSHCert {
+			return nil, trace.AccessDenied("MFA is required and only per-session MFA certificates are allowed: %t", isRegularSSHCert)
+		}
+
+		// Allow authentication to proceed.
+		return perms, nil
 	}
 
 	// keyboardInteractiveCallback handles keyboard-interactive authentication for modern clients.

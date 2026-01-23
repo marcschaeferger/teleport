@@ -1081,21 +1081,18 @@ func (a *ahLoginChecker) evaluateSSHAccess(ident *sshca.Identity, ca types.CertA
 		return nil, trace.Wrap(err)
 	}
 
-	var isModeratedSessionJoin bool
-	// custom moderated session join permissions allow bypass of the standard node access checks
-	if osUser == teleport.SSHSessionJoinPrincipal &&
-		moderation.RoleSupportsModeratedSessions(accessChecker.Roles()) {
+	// If access is conditional, collect preconditions. They will be set in the permit later.
+	var preconds []*decisionpb.Precondition
 
-		// bypass of standard node access checks can only proceed if MFA is not required and/or
-		// the MFA ceremony was already completed.
-		if state.MFARequired == services.MFARequiredNever || state.MFAVerified {
-			isModeratedSessionJoin = true
-		}
-	}
+	// Custom moderated session join permissions allow bypass of the standard node access checks if and only if MFA is
+	// not required.
+	bypassAccessCheck := osUser == teleport.SSHSessionJoinPrincipal &&
+		moderation.RoleSupportsModeratedSessions(accessChecker.Roles()) &&
+		state.MFARequired == services.MFARequiredNever
 
-	if !isModeratedSessionJoin {
-		// perform the primary node access check in all cases except for moderated session join
-		if err := accessChecker.CheckAccess(
+	// Perform the primary node access check unless bypass is allowed.
+	if !bypassAccessCheck {
+		if preconds, err = accessChecker.CheckConditionalAccess(
 			target,
 			state,
 			services.NewLoginMatcher(osUser),
@@ -1162,6 +1159,7 @@ func (a *ahLoginChecker) evaluateSSHAccess(ident *sshca.Identity, ca types.CertA
 		HostSudoers:           hostSudoers,
 		BpfEvents:             bpfEvents,
 		HostUsersInfo:         hostUsersInfo,
+		Preconditions:         preconds,
 	}, nil
 }
 

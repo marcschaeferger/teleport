@@ -69,6 +69,9 @@ func TestHandleKeyboardInteractiveAuth_PreCondInBandMFA(t *testing.T) {
 
 	h, id := setupKeyboardInteractiveAuthTest(t)
 
+	// TODO(cthach): Refactor.
+	id.MFAVerified = "open-sesame" // Simulate that MFA has been verified.
+
 	preconds := []*decisionpb.Precondition{
 		{
 			Kind: decisionpb.PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA,
@@ -162,7 +165,7 @@ func TestHandleKeyboardInteractiveAuth_ForceInBandMFAEnv_DisablesLegacyPublicKey
 	require.ErrorIs(
 		t,
 		err,
-		trace.AccessDenied(`Legacy public key authentication is forbidden (TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA = "yes")`),
+		trace.AccessDenied(`legacy public key authentication is forbidden (TELEPORT_UNSTABLE_FORCE_IN_BAND_MFA = "yes")`),
 	)
 }
 

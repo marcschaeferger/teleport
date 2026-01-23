@@ -2620,7 +2620,25 @@ func resourceRequiresLabelMatching(r AccessCheckable) bool {
 	return true
 }
 
+// checkAccess is like checkConditionalAccess but always returns an error if access should be denied.
 func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state AccessState, matchers ...RoleMatcher) error {
+	state.ReturnPreconditions = false
+
+	_, err := set.checkConditionalAccess(r, traits, state, matchers...)
+	return trace.Wrap(err)
+}
+
+// checkConditionalAccess evaluates access based on the provided resource, traits, states, and matchers. If returnErr is
+// true, it will deny access with an error if access is not allowed. If returnErr is false, access will similarly be
+// evaluated, however it will instead return all relevant preconditions and defer to the caller to enforce access. For
+// example, if per-session MFA is required and all other access checks pass, it will return a
+// decisionpb.PRECONDITION_KIND_IN_BAND_MFA and a nil error.
+func (set RoleSet) checkConditionalAccess(
+	r AccessCheckable,
+	traits wrappers.Traits,
+	state AccessState,
+	matchers ...RoleMatcher,
+) ([]*decisionpb.Precondition, error) {
 	// Note: logging in this function only happens in trace mode. This is because
 	// adding logging to this function (which is called on every resource returned
 	// by the backend) can slow down this function by 50x for large clusters!
@@ -2631,9 +2649,19 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 		logger.With("resource_kind", r.GetKind(), "resource_name", r.GetName())
 	}
 
+	// Collect unique set of preconds to return to the caller.
+	preconds := make(preconditionSet)
+
+	// Check if MFA is always required and just hasn't been verified yet.
 	if !state.MFAVerified && state.MFARequired == MFARequiredAlways {
-		logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, cluster requires per-session MFA")
-		return ErrSessionMFARequired
+		// If the caller doesn't want preconditions returned, deny access immediately.
+		if !state.ReturnPreconditions {
+			logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, cluster requires per-session MFA")
+			return nil, ErrSessionMFARequired
+		}
+
+		// Mark that MFA is required and continue evaluating access.
+		preconds[decisionpb.PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA] = struct{}{}
 	}
 
 	requiresLabelMatching := resourceRequiresLabelMatching(r)
@@ -2664,7 +2692,7 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 		if requiresLabelMatching {
 			matchLabels, labelsMessage, err := checkRoleLabelsMatch(types.Deny, role, traits, r, isLoggingEnabled)
 			if err != nil {
-				return trace.Wrap(err)
+				return nil, trace.Wrap(err)
 			}
 			if matchLabels {
 				logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, deny rule in role matched",
@@ -2672,7 +2700,7 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 					slog.String("namespace_message", namespaceMessage),
 					slog.String("label_message", labelsMessage),
 				)
-				return trace.AccessDenied("access to %v denied. User does not have permissions. %v",
+				return nil, trace.AccessDenied("access to %v denied. User does not have permissions. %v",
 					r.GetKind(), additionalDeniedMessage)
 			}
 		} else {
@@ -2682,14 +2710,14 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 		// at least one of the matchers returns true.
 		matchMatchers, matchersMessage, err := RoleMatchers(matchers).MatchAny(role, types.Deny)
 		if err != nil {
-			return trace.Wrap(err)
+			return nil, trace.Wrap(err)
 		}
 		if matchMatchers {
 			logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, deny rule in role matched",
 				slog.String("role", role.GetName()),
 				slog.Any("matcher_message", matchersMessage),
 			)
-			return trace.AccessDenied("access to %v denied. User does not have permissions. %v",
+			return nil, trace.AccessDenied("access to %v denied. User does not have permissions. %v",
 				r.GetKind(), additionalDeniedMessage)
 		}
 	}
@@ -2716,7 +2744,7 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 		if requiresLabelMatching {
 			matchLabels, labelsMessage, err := checkRoleLabelsMatch(types.Allow, role, traits, r, isLoggingEnabled)
 			if err != nil {
-				return trace.Wrap(err)
+				return nil, trace.Wrap(err)
 			}
 
 			if !matchLabels {
@@ -2734,7 +2762,7 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 		// matchers return true.
 		matchMatchers, err := RoleMatchers(matchers).MatchAll(role, types.Allow)
 		if err != nil {
-			return trace.Wrap(err)
+			return nil, trace.Wrap(err)
 		}
 		if !matchMatchers {
 			if isLoggingEnabled {
@@ -2758,15 +2786,21 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 			logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource granted, allow rule in role matched",
 				slog.String("role", role.GetName()),
 			)
-			return nil
+			return nil, nil
 		}
 
-		// MFA verification.
+		// Check MFA requirement at the role level.
 		if !mfaAllowed && role.GetOptions().RequireMFAType.IsSessionMFARequired() {
-			logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, role requires per-session MFA",
-				slog.String("role", role.GetName()),
-			)
-			return ErrSessionMFARequired
+			// If the caller doesn't want preconditions returned, deny access immediately.
+			if !state.ReturnPreconditions {
+				logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, role requires per-session MFA",
+					slog.String("role", role.GetName()),
+				)
+				return nil, ErrSessionMFARequired
+			}
+
+			// Mark that MFA is required and continue evaluating access.
+			preconds[decisionpb.PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA] = struct{}{}
 		}
 
 		// Device verification.
@@ -2781,7 +2815,7 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 			logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, role requires a trusted device",
 				slog.String("role", role.GetName()),
 			)
-			return trace.Wrap(err)
+			return nil, trace.Wrap(err)
 		}
 
 		// Current role allows access, but keep looking for a more restrictive
@@ -2793,13 +2827,13 @@ func (set RoleSet) checkAccess(r AccessCheckable, traits wrappers.Traits, state 
 	}
 
 	if allowed {
-		return nil
+		return preconds.ToSlice(), nil
 	}
 
 	logger.LogAttrs(ctx, logutils.TraceLevel, "Access to resource denied, no allow rule matched",
 		slog.Any("errors", errs),
 	)
-	return trace.AccessDenied("access to %v denied. User does not have permissions. %v",
+	return nil, trace.AccessDenied("access to %v denied. User does not have permissions. %v",
 		r.GetKind(), additionalDeniedMessage)
 }
 
@@ -2831,6 +2865,25 @@ func (set RoleSet) CheckDeviceAccess(state AccessState) error {
 		}
 	}
 	return nil
+}
+
+// preconditionSet is a set of unique preconditions.
+type preconditionSet map[decisionpb.PreconditionKind]struct{}
+
+// ToSlice converts the precondition set to a slice.
+func (p preconditionSet) ToSlice() []*decisionpb.Precondition {
+	preconds := make([]*decisionpb.Precondition, 0, len(p))
+
+	for kind := range p {
+		preconds = append(
+			preconds,
+			&decisionpb.Precondition{
+				Kind: kind,
+			},
+		)
+	}
+
+	return preconds
 }
 
 // checkRoleLabelsMatch checks if the [role] matches the labels of [resource]
@@ -3673,6 +3726,10 @@ type AccessState struct {
 	// IsBot determines whether the user certificate belongs to a bot. It's used
 	// when deciding whether to enforce device verification.
 	IsBot bool
+	// ReturnPreconditions, when set to true, causes access checks to return a list of preconditions (such as MFA or
+	// device verification requirements) instead of immediately returning an access error. This allows callers to
+	// programmatically determine what additional steps are required for access, rather than failing outright.
+	ReturnPreconditions bool
 }
 
 // MFARequired determines when MFA is required for a user to access a resource.

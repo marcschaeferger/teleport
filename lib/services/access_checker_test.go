@@ -20,6 +20,7 @@ package services
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"testing"
 
@@ -694,6 +695,94 @@ func TestAccessCheckerDesktopGroups(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAccessChecker_CheckConditionalAccess_StateMFARequiredAlways_ReturnPreconditions(t *testing.T) {
+	t.Parallel()
+
+	roleName := "allow-all-nodes"
+
+	roleSet := NewRoleSet(newRole(func(rv *types.RoleV6) {
+		rv.SetName(roleName)
+		rv.SetNodeLabels(types.Allow, types.Labels{"*": {"*"}})
+	}))
+
+	accessInfo := &AccessInfo{
+		Roles: []string{roleName},
+	}
+
+	accessChecker := NewAccessCheckerWithRoleSet(accessInfo, "cluster", roleSet)
+
+	srv, err := types.NewServer(
+		"test-server",
+		types.KindNode,
+		types.ServerSpecV2{},
+	)
+	require.NoError(t, err)
+
+	node := &serverStub{Server: srv}
+
+	preconds, err := accessChecker.CheckConditionalAccess(
+		node,
+		AccessState{
+			MFARequired:         MFARequiredAlways, // State requires MFA.
+			ReturnPreconditions: true,
+		},
+	)
+	require.NoError(t, err)
+	require.True(
+		t,
+		slices.ContainsFunc(preconds, func(p *decisionpb.Precondition) bool {
+			return p.GetKind() == decisionpb.PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA
+		}),
+		"preconditions should include PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA",
+	)
+}
+
+func TestAccessChecker_CheckConditionalAccess_RoleMFARequired_ReturnPreconditions(t *testing.T) {
+	t.Parallel()
+
+	roleName := "mfa-required"
+
+	roleSet := NewRoleSet(newRole(func(rv *types.RoleV6) {
+		rv.SetName(roleName)
+
+		rv.SetOptions(types.RoleOptions{
+			RequireMFAType: types.RequireMFAType_SESSION, // Role requires MFA.
+		})
+
+		rv.SetNodeLabels(types.Allow, types.Labels{"*": {"*"}})
+	}))
+
+	accessInfo := &AccessInfo{
+		Roles: []string{roleName},
+	}
+
+	accessChecker := NewAccessCheckerWithRoleSet(accessInfo, "cluster", roleSet)
+
+	srv, err := types.NewServer(
+		"test-server",
+		types.KindNode,
+		types.ServerSpecV2{},
+	)
+	require.NoError(t, err)
+
+	node := &serverStub{Server: srv}
+
+	preconds, err := accessChecker.CheckConditionalAccess(
+		node,
+		AccessState{
+			ReturnPreconditions: true,
+		},
+	)
+	require.NoError(t, err)
+	require.True(
+		t,
+		slices.ContainsFunc(preconds, func(p *decisionpb.Precondition) bool {
+			return p.GetKind() == decisionpb.PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA
+		}),
+		"preconditions should include PreconditionKind_PRECONDITION_KIND_IN_BAND_MFA",
+	)
 }
 
 func TestSSHPortForwarding(t *testing.T) {
