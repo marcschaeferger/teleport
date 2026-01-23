@@ -513,7 +513,9 @@ You should see output displaying the Teleport version number.
 >
 
 - Re-download packages if checksum verification fails.
-- Ensure the install script was executed for TAR installs.
+- Ensure the correct installation method was used for TAR installs. For static installations, check that you ran the 
+  install script from the extracted directory (`sudo ./install`). This copies binaries to `/usr/local/bin/` and sets 
+  up the systemd unit file. For managed updates, you would use `sudo teleport-update enable`.
 - Resolve dependency issues using:
 ```code
   $ apt-get install -f
@@ -525,10 +527,14 @@ You should see output displaying the Teleport version number.
   $ teleport-update enable
   $ sudo systemctl start teleport
 ```
-- Ensure the package architecture matches:
+- Ensure the package architecture matches the downloaded package (amd64, arm64, etc.) in the output:
 ```code
   $ uname -m
 ```
+- If `systemd` does not recognize the Teleport service, reload unit files with:
+  ```code
+  $ sudo systemctl daemon-reload
+  ```
 </Checkpoint>
 
 ### From your browser
