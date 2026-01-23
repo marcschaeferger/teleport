@@ -58,16 +58,16 @@ to integrate with your infrastructure.
 
 ### Generate a starter config file
 
+Generate a configuration file with placeholder values for the Teleport Event
+Handler plugin. Later in this guide, we will edit the configuration file for
+your environment.
+
 (!docs/pages/includes/configure-event-handler.mdx!)
 
 If you have an existing Fluentd setup with TLS, issue a client certificate and
 key from the same certificate authority for the Teleport Event Handler to use.
 
 ### Define RBAC resources and issue credentials for the Event Handler role
-
-The Teleport Event Handler needs credentials to authenticate to the Teleport
-Auth Service. In this section, you will give the Event Handler access to these
-credentials.
 
 <Tabs>
 <TabItem label="tctl">
@@ -102,7 +102,7 @@ longer-lived identity files with `tctl`:
 
 </TabItem>
 <TabItem label="Kubernetes Operator">
-(!docs/pages/includes/plugins/operator-crd-config.mdx plugin="teleport-plugin-event-handler"!)
+(!docs/pages/includes/plugins/operator-crs-event-handler.mdx plugin="teleport-plugin-event-handler"!)
 </TabItem>
 </Tabs>
 
