@@ -2723,6 +2723,12 @@ message GetAlertAcksResponse {
   ];
 }
 
+// DeleteClustAlertRequest specifies an alert or multiple alerts to delete.
+message DeleteClusterAlertRequest {
+  // AlertID is the ID of the alert to delete. Deletes all cluster alerts if the id is '*'.
+  string AlertID = 1 [(gogoproto.jsontag) = "alert_id"];
+}
+
 // ClearAlertAcksRequest specifies alerts acknowledgements to clear.
 message ClearAlertAcksRequest {
   // AlertID deletes an acknowledgement by ID. Deletes all acknowledgements if
@@ -2992,6 +2998,9 @@ service AuthService {
 
   // UpsertClusterAlert creates a cluster alert.
   rpc UpsertClusterAlert(UpsertClusterAlertRequest) returns (google.protobuf.Empty);
+
+  // DeleteClusterAlerts deletes a cluster alert.
+  rpc DeleteClusterAlerts(DeleteClusterAlertRequest) returns (google.protobuf.Empty);
 
   // CreateAlertAck marks a cluster alert as acknowledged.
   rpc CreateAlertAck(types.AlertAcknowledgement) returns (google.protobuf.Empty);

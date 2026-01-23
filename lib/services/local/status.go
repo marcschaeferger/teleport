@@ -147,13 +147,20 @@ func (s *StatusService) UpsertClusterAlert(ctx context.Context, alert types.Clus
 	return trace.Wrap(err)
 }
 
-func (s *StatusService) DeleteClusterAlert(ctx context.Context, alertID string) error {
+func (s *StatusService) DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error {
+	if req.AlertID == "" {
+		return trace.BadParameter("missing alert id for deletion")
+	}
+	if req.AlertID == types.Wildcard {
+		startKey := backend.ExactKey(clusterAlertPrefix)
+		return trace.Wrap(s.Backend.DeleteRange(ctx, startKey, backend.RangeEnd(startKey)))
+	}
 	// Key construction relies on [backend.KeyFromString] for the alert name, because there are existing
 	// alerts that include a / in their name. Without reconstructing the key it would be impossible
 	// for the sanitization layer to analyze the individual components separately.
-	err := s.Backend.Delete(ctx, backend.NewKey(clusterAlertPrefix).AppendKey(backend.KeyFromString(alertID)))
+	err := s.Backend.Delete(ctx, backend.NewKey(clusterAlertPrefix).AppendKey(backend.KeyFromString(req.AlertID)))
 	if trace.IsNotFound(err) {
-		return trace.NotFound("cluster alert %q not found", alertID)
+		return trace.NotFound("cluster alert %q not found", req.AlertID)
 	}
 	return trace.Wrap(err)
 }

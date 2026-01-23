@@ -958,6 +958,19 @@ func (g *GRPCServer) CreateAlertAck(ctx context.Context, ack *types.AlertAcknowl
 	return &emptypb.Empty{}, nil
 }
 
+func (g *GRPCServer) DeleteClusterAlerts(ctx context.Context, req *authpb.DeleteClusterAlertRequest) (*emptypb.Empty, error) {
+	auth, err := g.authenticate(ctx)
+	if err != nil {
+		return nil, trail.ToGRPC(err)
+	}
+
+	if err := auth.DeleteClusterAlerts(ctx, *req); err != nil {
+		return nil, trail.ToGRPC(err)
+	}
+
+	return &emptypb.Empty{}, nil
+}
+
 func (g *GRPCServer) GetAlertAcks(ctx context.Context, _ *authpb.GetAlertAcksRequest) (*authpb.GetAlertAcksResponse, error) {
 	auth, err := g.authenticate(ctx)
 	if err != nil {

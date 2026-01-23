@@ -27,6 +27,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gravitational/trace"
 
+	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/utils/retryutils"
 	prehogv1 "github.com/gravitational/teleport/gen/proto/go/prehog/v1"
@@ -70,7 +71,7 @@ type SubmitterConfig struct {
 	// Logger is the used for emitting log messages.
 	Logger *slog.Logger
 	// Status is used to create or clear cluster alerts on a failure. Required.
-	Status services.StatusInternal
+	Status services.Status
 	// Submitter is used to submit usage reports. Required.
 	Submitter UsageReportsSubmitter
 
@@ -268,7 +269,7 @@ func submitOnce(ctx context.Context, c SubmitterConfig) {
 // ClearAlert attempts to delete the reporting-failed alert; it's expected to
 // return nil if it successfully deletes the alert, and a trace.NotFound error
 // if there's no alert.
-func ClearAlert(ctx context.Context, status services.StatusInternal) error {
+func ClearAlert(ctx context.Context, status services.Status) error {
 	if _, err := status.GetClusterAlerts(ctx, types.GetClusterAlertsRequest{
 		AlertID: alertName,
 	}); err != nil && trace.IsNotFound(err) {
@@ -277,5 +278,5 @@ func ClearAlert(ctx context.Context, status services.StatusInternal) error {
 		// are cheaper than writes)
 		return trace.Wrap(err)
 	}
-	return trace.Wrap(status.DeleteClusterAlert(ctx, alertName))
+	return trace.Wrap(status.DeleteClusterAlerts(ctx, proto.DeleteClusterAlertRequest{AlertID: alertName}))
 }

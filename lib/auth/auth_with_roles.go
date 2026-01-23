@@ -961,6 +961,13 @@ func (a *ServerWithRoles) UpsertClusterAlert(ctx context.Context, alert types.Cl
 	return a.authServer.UpsertClusterAlert(ctx, alert)
 }
 
+func (a *ServerWithRoles) DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error {
+	if err := a.authorizeAction(types.KindClusterAlert, types.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.DeleteClusterAlerts(ctx, req)
+}
+
 func (a *ServerWithRoles) CreateAlertAck(ctx context.Context, ack types.AlertAcknowledgement) error {
 	// we treat alert acks as an extension of the cluster alert resource rather than its own resource
 	if err := a.authorizeAction(types.KindClusterAlert, types.VerbUpdate); err != nil {

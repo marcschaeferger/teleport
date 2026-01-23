@@ -31,6 +31,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/gravitational/teleport"
+	"github.com/gravitational/teleport/api/client/proto"
 	auditlogpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/auditlog/v1"
 	"github.com/gravitational/teleport/api/internalutils/stream"
 	"github.com/gravitational/teleport/api/types"
@@ -61,7 +62,7 @@ type ClusterAlertService interface {
 	// UpsertClusterAlert creates the specified alert, overwriting any preexising alert with the same ID.
 	UpsertClusterAlert(ctx context.Context, alert types.ClusterAlert) error
 	// DeleteClusterAlert deletes the cluster alert with the specified ID.
-	DeleteClusterAlert(ctx context.Context, alertID string) error
+	DeleteClusterAlerts(ctx context.Context, alert proto.DeleteClusterAlertRequest) error
 }
 
 // ErrorCounter is used when the External Audit Storage feature is enabled to
@@ -203,7 +204,7 @@ func (c *ErrorCounter) sync(ctx context.Context) {
 		}
 	}
 	for _, alertToClear := range allAlertActions.clearAlerts {
-		if err := c.alertService.DeleteClusterAlert(ctx, alertToClear); err != nil && !trace.IsNotFound(err) {
+		if err := c.alertService.DeleteClusterAlerts(ctx, proto.DeleteClusterAlertRequest{AlertID: alertToClear}); err != nil && !trace.IsNotFound(err) {
 			log.InfoContext(ctx, "ErrorCounter failed to delete cluster alert",
 				"alert_name", alertToClear,
 				"error", err,

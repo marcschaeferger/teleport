@@ -41,12 +41,15 @@ type Status interface {
 
 	// ClearAlertAcks clears alert acknowledgments.
 	ClearAlertAcks(ctx context.Context, req proto.ClearAlertAcksRequest) error
+
+	// DeleteClusterAlerts deletes cluster alerts matching the request.
+	DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error
 }
 
-// StatusInternal extends Status with auth-internal methods.
+// TODO: william-tel delete this once e/lib/licensechecker uses the new DeleteClusterAlerts function
 type StatusInternal interface {
 	Status
 
-	// DeleteClusterAlert deletes the cluster alert with the specified ID.
+	// DeleteClusterAlert deletes the specified cluster alert by ID.
 	DeleteClusterAlert(ctx context.Context, alertID string) error
 }

@@ -4996,6 +4996,11 @@ func (c *Client) UpsertClusterAlert(ctx context.Context, alert types.ClusterAler
 	return trace.Wrap(err)
 }
 
+func (c *Client) DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error {
+	_, err := c.grpc.DeleteClusterAlerts(ctx, &req)
+	return trace.Wrap(err)
+}
+
 func (c *Client) ChangePassword(ctx context.Context, req *proto.ChangePasswordRequest) error {
 	_, err := c.grpc.ChangePassword(ctx, req)
 	return trace.Wrap(err)

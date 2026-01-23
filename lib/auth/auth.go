@@ -676,7 +676,7 @@ func NewServer(cfg *InitConfig, opts ...ServerOption) (as *Server, err error) {
 		DatabaseObjects:                 cfg.DatabaseObjects,
 		SecReports:                      cfg.SecReports,
 		UserLoginStates:                 cfg.UserLoginState,
-		StatusInternal:                  cfg.Status,
+		Status:                          cfg.Status,
 		UsageReporter:                   cfg.UsageReporter,
 		UserPreferences:                 cfg.UserPreferences,
 		PluginData:                      cfg.PluginData,
@@ -1907,7 +1907,7 @@ func (a *Server) runPeriodicOperations() {
 			FirstDuration: retryutils.HalfJitter(10 * time.Second),
 			Jitter:        retryutils.HalfJitter,
 		})
-	} else if err := a.DeleteClusterAlert(a.closeCtx, OSSDesktopsAlertID); err != nil && !trace.IsNotFound(err) {
+	} else if err := a.DeleteClusterAlerts(a.closeCtx, proto.DeleteClusterAlertRequest{AlertID: OSSDesktopsAlertID}); err != nil && !trace.IsNotFound(err) {
 		a.logger.WarnContext(a.closeCtx, "Can't delete OSS non-AD desktops limit alert", "error", err)
 	}
 
@@ -2134,7 +2134,7 @@ func (a *Server) handleUpgradeEnrollPrompt(ctx context.Context, msg string, shou
 	const alertTTL = time.Minute * 30
 
 	if !shouldPrompt {
-		if err := a.DeleteClusterAlert(ctx, upgradeEnrollAlertID); err != nil && !trace.IsNotFound(err) {
+		if err := a.DeleteClusterAlerts(ctx, proto.DeleteClusterAlertRequest{AlertID: upgradeEnrollAlertID}); err != nil && !trace.IsNotFound(err) {
 			a.logger.WarnContext(ctx, "Failed to delete auto-upgrade-enroll alert", "error", err)
 		}
 		return
@@ -2302,7 +2302,7 @@ func (a *Server) doReleaseAlertSync(ctx context.Context, current vc.Target, visi
 			return
 		}
 	} else if cleanup {
-		err := a.DeleteClusterAlert(ctx, secAlertID)
+		err := a.DeleteClusterAlerts(ctx, proto.DeleteClusterAlertRequest{AlertID: secAlertID})
 		if err != nil && !trace.IsNotFound(err) {
 			a.logger.WarnContext(ctx, "Failed to delete security-patch-available alert", "error", err)
 		}

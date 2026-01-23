@@ -29,6 +29,7 @@ import (
 	"github.com/gravitational/trace"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	apievents "github.com/gravitational/teleport/api/types/events"
 	"github.com/gravitational/teleport/lib/events"
@@ -342,7 +343,8 @@ func (f *fakeAlertService) UpsertClusterAlert(ctx context.Context, alert types.C
 	return nil
 }
 
-func (f *fakeAlertService) DeleteClusterAlert(ctx context.Context, alertID string) error {
+func (f *fakeAlertService) DeleteClusterAlerts(ctx context.Context, alert proto.DeleteClusterAlertRequest) error {
+	alertID := alert.AlertID
 	if _, found := f.alerts[alertID]; !found {
 		return trace.NotFound("cluster alert %s not found", alertID)
 	}

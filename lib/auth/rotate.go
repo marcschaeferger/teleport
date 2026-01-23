@@ -29,6 +29,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/api/utils/keys"
 	"github.com/gravitational/teleport/lib/auth/keystore"
@@ -583,7 +584,7 @@ func (a *Server) syncUsableKeysAlert(ctx context.Context, usableKeysResults map[
 	if len(casWithoutPreferredKeyType) == 0 {
 		// Every CA contains keys matching the preferred type, delete the alert
 		// if it exists.
-		if err := a.DeleteClusterAlert(ctx, alertID); err != nil && !trace.IsNotFound(err) {
+		if err := a.DeleteClusterAlerts(ctx, proto.DeleteClusterAlertRequest{AlertID: alertID}); err != nil && !trace.IsNotFound(err) {
 			return trace.Wrap(err)
 		}
 		return nil
