@@ -31,17 +31,12 @@ out-of-date, become incompatible with the cluster, and eventually disconnect.
 
 ## Installing Teleport as a cluster
 
-If you are starting out with Teleport, we recommend beginning with a [Teleport Cloud](https://goteleport.com/signup/) account. From there, the only Teleport components you need to deploy yourself are Teleport Agents, which is discussed in the [next section](#installing-teleport-as-an-agent).
+These steps are specifically for the Teleport Enterprise (Self-Hosted) and Community Edition versions.
 
+If you are starting out with Teleport, we recommend beginning with a [Teleport Cloud](https://goteleport.com/signup/) account. From there, the only Teleport components you need to deploy yourself are Teleport Agents, which is discussed in the [next section](#installing-teleport-as-an-agent).
 If you are self-hosting a Teleport cluster, please take a look at our [Linux Demo](../get-started/deploy-community.mdx) for the Teleport Community Edition or our [Self-Hosting Teleport](../zero-trust-access/deploy-a-cluster/deploy-a-cluster.mdx) section in the docs for more information on Teleport Enterprise Self-Hosted.
 
 <Tabs>
-<TabItem label="Teleport Enterprise Cloud (Managed)">
-
-Teleport Enterprise Cloud is provisioned and managed for you so there are no install steps. The only Teleport
-components you need to deploy yourself are Teleport Agents.
-
-</TabItem>
 <TabItem label="Teleport Enterprise (Self-Hosted)">
 ```code
 $ TELEPORT_EDITION="enterprise"
@@ -86,15 +81,15 @@ You should see output displaying the Teleport version number.
 
 - If `teleport` is not found, ensure `/usr/local/bin` is included in your `PATH`.
 - If the service is not running, start it with:
-  ```bash
-  sudo systemctl start teleport
+  ```code
+  $ sudo systemctl start teleport
   ```
 - Check logs for startup errors:
-  ```bash
-  sudo journalctl -u teleport --no-pager
+  ```code
+  $ sudo journalctl -u teleport --no-pager
   ```
 - Ensure the host has outbound internet access during installation.
-- If systemd is not available, use a TAR archive installation instead.
+- If systemd is not available, use a [TAR archive installation](#downloading-packages-and-tar-archives) instead.
 
 </Checkpoint>
 
@@ -119,7 +114,7 @@ Outside of the Web UI, you can run our one-line cluster install script on your L
    This should contain your cluster hostname and port, but not the scheme (https://).
 1. Run your cluster's install script:
 ```code
-   $ curl "https://<Var name="example.teleport.sh:443"/>/scripts/install.sh" | sudo bash
+$ curl "https://<Var name="example.teleport.sh:443"/>/scripts/install.sh" | sudo bash
 ```
 
 You can also use the example Terraform module for deploying agents in [Deploy
@@ -142,20 +137,23 @@ You should see the Teleport version and a status showing the service is active a
 >
 
 - Start the service if it is not running:
-  ```bash
-  sudo systemctl start teleport
-  ```
+```code
+$ sudo systemctl start teleport
+```
 - Check logs:
-  ```bash
-  sudo journalctl -u teleport --no-pager
-  ```
+```code
+$ sudo journalctl -u teleport --no-pager
+```
 - Verify the join token is valid and unexpired.
-- Ensure the agent can reach the Teleport Proxy (firewalls, security groups).
+- Ensure the agent can reach the Teleport Proxy Service (firewalls, security groups).
 - Ensure system time is synchronized (for example, using `chronyd` or `systemd-timesyncd`).  
-  Clock skew can prevent agents from joining.
+  Clock skew can prevent agents from joining. Look for "clock skew detected" or certificate 
+  validity errors in the logs, and run `timedatectl timesync-status` to verify system time is 
+  correct and NTP is active. The output `System clock synchronized: yes` indicates the system clock has 
+  successfully synced with a time source.
 - On SELinux systems, check for denied operations:
-  ```bash
-  ausearch -m avc -ts recent
+  ```code
+  $ ausearch -m avc -ts recent
   ```
 - If your environment uses outbound TLS inspection or proxies, ensure Teleport traffic is not intercepted.
 
@@ -360,7 +358,7 @@ You should see output displaying the Teleport version number.
   description="If the installation failed or packages were not found, try these steps."
 >
 
-- Verify `ID`, `VERSION_ID`, and `VERSION_CODENAME` in `/etc/os-release`.
+- Verify `ID`, `VERSION_ID`, and `VERSION_CODENAME` are in `/etc/os-release`.
 - For apt-based systems, ensure the GPG key exists in `/etc/apt/keyrings/`.
 - Verify the correct `TELEPORT_CHANNEL` is configured.
 - If `teleport` or `tctl` works without `sudo` but fails with it, ensure `/usr/local/bin` is included in sudo’s secure path.
@@ -517,18 +515,20 @@ You should see output displaying the Teleport version number.
 - Re-download packages if checksum verification fails.
 - Ensure the install script was executed for TAR installs.
 - Resolve dependency issues using:
-  - `apt-get install -f`
-  - `yum localinstall`
-  - `dnf localinstall`
+```code
+  $ apt-get install -f
+  $ yum localinstall
+  $ dnf localinstall
+```  
 - After enabling managed updates:
-  ```bash
-  teleport-update enable
-  sudo systemctl start teleport
-  ```
+```code
+  $ teleport-update enable
+  $ sudo systemctl start teleport
+```
 - Ensure the package architecture matches:
-  ```bash
-  uname -m
-  ```
+```code
+  $ uname -m
+```
 </Checkpoint>
 
 ### From your browser
