@@ -858,11 +858,6 @@ func TestDiscoveryServer(t *testing.T) {
 			}
 			tlsServer.Auth().SetUsageReporter(reporter)
 
-			if tc.discoveryConfig != nil {
-				_, err := tlsServer.Auth().DiscoveryConfigs.CreateDiscoveryConfig(ctx, tc.discoveryConfig)
-				require.NoError(t, err)
-			}
-
 			fakeConfigProvider := mocks.AWSConfigProvider{
 				OIDCIntegrationClient: tlsServer.Auth(),
 			}
@@ -890,6 +885,18 @@ func TestDiscoveryServer(t *testing.T) {
 			server.ec2Installer = installer
 			tc.emitter.server = server
 			tc.emitter.t = t
+
+			if tc.discoveryConfig != nil {
+				_, err := tlsServer.Auth().DiscoveryConfigs.CreateDiscoveryConfig(ctx, tc.discoveryConfig)
+				require.NoError(t, err)
+
+				// DiscoveryConfigs are asynchronously loaded, wait until the server has loaded them.
+				require.Eventually(t, func() bool {
+					server.dynamicDiscoveryConfigMu.RLock()
+					defer server.dynamicDiscoveryConfigMu.RUnlock()
+					return len(server.dynamicDiscoveryConfig) > 0
+				}, 10*time.Second, 50*time.Millisecond)
+			}
 
 			go server.Start()
 			t.Cleanup(server.Stop)
@@ -923,6 +930,9 @@ func TestDiscoveryServer(t *testing.T) {
 					want := *tc.wantDiscoveryConfigStatus
 					got := storedDiscoveryConfig.Status
 
+					if want.DiscoveredResources > 0 && storedDiscoveryConfig.Status.DiscoveredResources == 0 {
+						return false
+					}
 					require.Equal(t, want.State, got.State)
 					require.Equal(t, want.DiscoveredResources, got.DiscoveredResources)
 					require.Equal(t, want.ErrorMessage, got.ErrorMessage)
@@ -969,6 +979,124 @@ func fetchAllUserTasks(t *testing.T, userTasksClt services.UserTasks, minUserTas
 	}, 10*time.Second, 50*time.Millisecond)
 
 	return existingTasks
+}
+
+// This test exercises the dynamic matcher watcher and ensures that if there's a failure in the watcher,
+// it restarts and continues to pick up new Discovery Configs matchers.
+func TestDiscoveryServer_dynamicMatcherRestart(t *testing.T) {
+	t.Parallel()
+
+	// Create and start test auth server.
+	testAuthServer, err := authtest.NewAuthServer(authtest.AuthServerConfig{
+		Dir: t.TempDir(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, testAuthServer.Close()) })
+
+	tlsServer, err := testAuthServer.NewTestTLSServer()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, tlsServer.Close()) })
+
+	// Auth client for discovery service.
+	identity := authtest.TestServerID(types.RoleDiscovery, "hostID")
+	authClient, err := tlsServer.NewClient(identity)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, authClient.Close()) })
+
+	reporter := &mockUsageReporter{}
+	tlsServer.Auth().SetUsageReporter(reporter)
+
+	fakeConfigProvider := mocks.AWSConfigProvider{
+		OIDCIntegrationClient: tlsServer.Auth(),
+	}
+	ec2ClientGetter := func(ctx context.Context, region string, opts ...awsconfig.OptionsFn) (ec2.DescribeInstancesAPIClient, error) {
+		return &mockEC2Client{
+			output: &ec2.DescribeInstancesOutput{
+				Reservations: []ec2types.Reservation{},
+			}}, nil
+	}
+	ssmClientGetter := func(ctx context.Context, region string, opts ...awsconfig.OptionsFn) (server.SSMClient, error) {
+		return &mockSSMClient{}, nil
+	}
+
+	fakeClock := clockwork.NewFakeClock()
+	fakeEmitter := &mockEmitter{
+		eventHandler: func(t *testing.T, ae events.AuditEvent, server *Server) {},
+		t:            t,
+	}
+
+	server, err := New(authz.ContextWithUser(context.Background(), identity.I), &Config{
+		GetEC2Client:      ec2ClientGetter,
+		GetSSMClient:      ssmClientGetter,
+		AWSConfigProvider: &fakeConfigProvider,
+		AWSFetchersClients: &mockFetchersClients{
+			AWSConfigProvider: fakeConfigProvider,
+		},
+		ClusterFeatures:  func() proto.Features { return proto.Features{} },
+		KubernetesClient: fake.NewClientset(),
+		AccessPoint:      getDiscoveryAccessPointWithEKSEnroller(tlsServer.Auth(), authClient, authClient.IntegrationAWSOIDCClient()),
+		Matchers:         Matchers{},
+		Emitter:          fakeEmitter,
+		Log:              logtest.NewLogger(),
+		DiscoveryGroup:   "discovery-group",
+		clock:            fakeClock,
+	})
+	require.NoError(t, err)
+
+	server.ec2Installer = &mockSSMInstaller{
+		installedInstances: make(map[string]struct{}),
+	}
+	fakeEmitter.server = server
+
+	go server.Start()
+	t.Cleanup(server.Stop)
+
+	server.dynamicDiscoveryConfigMu.RLock()
+	require.Len(t, server.dynamicDiscoveryConfig, 0)
+	server.dynamicDiscoveryConfigMu.RUnlock()
+
+	// 1. Send a new Discovery Config and ensure it gets loaded into the dynamic matchers.
+	discoveryConfigA, err := discoveryconfig.NewDiscoveryConfig(
+		header.Metadata{Name: "dc-a"},
+		discoveryconfig.Spec{
+			DiscoveryGroup: "discovery-group",
+			AWS:            []types.AWSMatcher{},
+		},
+	)
+	require.NoError(t, err)
+	_, err = tlsServer.Auth().DiscoveryConfigs.CreateDiscoveryConfig(t.Context(), discoveryConfigA)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		server.dynamicDiscoveryConfigMu.RLock()
+		defer server.dynamicDiscoveryConfigMu.RUnlock()
+		return len(server.dynamicDiscoveryConfig) == 1
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// 2. Break the watcher
+	server.dynamicDiscoveryConfigMu.Lock()
+	server.dynamicMatcherWatcher.Close()
+	server.dynamicDiscoveryConfigMu.Unlock()
+
+	// 3. Send a new Discovery Config and ensure it gets loaded into the dynamic matchers. In this case it will require the watcher to have restarted.
+	discoveryConfigB, err := discoveryconfig.NewDiscoveryConfig(
+		header.Metadata{Name: "dc-b"},
+		discoveryconfig.Spec{
+			DiscoveryGroup: "discovery-group",
+			AWS:            []types.AWSMatcher{},
+		},
+	)
+	require.NoError(t, err)
+	_, err = tlsServer.Auth().DiscoveryConfigs.CreateDiscoveryConfig(t.Context(), discoveryConfigB)
+	require.NoError(t, err)
+
+	// DynamicMatcher watcher waits 1 minute before restarting, but in tests we can speed this up by advancing the fake clock.
+	fakeClock.Advance(2 * time.Minute)
+
+	require.Eventually(t, func() bool {
+		server.dynamicDiscoveryConfigMu.RLock()
+		defer server.dynamicDiscoveryConfigMu.RUnlock()
+		return len(server.dynamicDiscoveryConfig) == 2
+	}, 5*time.Second, 50*time.Millisecond)
 }
 
 func TestDiscoveryServerConcurrency(t *testing.T) {
