@@ -515,18 +515,18 @@ You should see output displaying the Teleport version number.
 - Re-download packages if checksum verification fails.
 - Ensure the correct installation method was used for TAR installs. For static installations, check that you ran the 
   install script from the extracted directory (`sudo ./install`). This copies binaries to `/usr/local/bin/` and sets 
-  up the systemd unit file. For managed updates, you would use `sudo teleport-update enable`.
+  up the systemd unit file. 
+- After enabling managed updates:
+```code
+  $ teleport-update enable
+  $ sudo systemctl start teleport
+```
 - Resolve dependency issues using:
 ```code
   $ apt-get install -f
   $ yum localinstall
   $ dnf localinstall
 ```  
-- After enabling managed updates:
-```code
-  $ teleport-update enable
-  $ sudo systemctl start teleport
-```
 - Ensure the package architecture matches the downloaded package (amd64, arm64, etc.) in the output:
 ```code
   $ uname -m
