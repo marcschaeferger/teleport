@@ -37,13 +37,13 @@ type entitlement =
   | 'OIDC'
   | 'OktaSCIM'
   | 'OktaUserSync'
-  | 'Policy'
   | 'SAML'
   | 'SessionLocks'
   | 'UnrestrictedManagedUpdates'
   | 'UpsellAlert'
   | 'UsageReporting'
-  | 'ClientIPRestrictions';
+  | 'ClientIPRestrictions'
+  | 'AccessGraph';
 
 export const defaultEntitlements: Record<
   entitlement,
@@ -68,11 +68,11 @@ export const defaultEntitlements: Record<
   OIDC: { enabled: false, limit: 0 },
   OktaSCIM: { enabled: false, limit: 0 },
   OktaUserSync: { enabled: false, limit: 0 },
-  Policy: { enabled: false, limit: 0 },
   SAML: { enabled: false, limit: 0 },
   SessionLocks: { enabled: false, limit: 0 },
   UnrestrictedManagedUpdates: { enabled: false, limit: 0 },
   UpsellAlert: { enabled: false, limit: 0 },
   UsageReporting: { enabled: false, limit: 0 },
   ClientIPRestrictions: { enabled: false, limit: 0 },
+  AccessGraph: { enabled: false, limit: 0 },
 };

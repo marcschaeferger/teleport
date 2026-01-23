@@ -344,7 +344,7 @@ func (s *Server) initializeAndWatchAccessGraph(ctx context.Context, reloadCh <-c
 	)
 
 	clusterFeatures := s.Config.ClusterFeatures()
-	policy := modules.GetProtoEntitlement(&clusterFeatures, entitlements.Policy)
+	policy := modules.GetProtoEntitlement(&clusterFeatures, entitlements.AccessGraph)
 	if !clusterFeatures.AccessGraph && !policy.Enabled {
 		return trace.Wrap(errTAGFeatureNotEnabled)
 	}
@@ -646,7 +646,7 @@ func (s *Server) startCloudtrailPoller(ctx context.Context, reloadCh <-chan stru
 	const semaphoreName = "access_graph_aws_cloudtrail_sync"
 
 	clusterFeatures := s.Config.ClusterFeatures()
-	policy := modules.GetProtoEntitlement(&clusterFeatures, entitlements.Policy)
+	policy := modules.GetProtoEntitlement(&clusterFeatures, entitlements.AccessGraph)
 	if !clusterFeatures.AccessGraph && !policy.Enabled {
 		return trace.Wrap(errTAGFeatureNotEnabled)
 	}

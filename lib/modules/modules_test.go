@@ -156,7 +156,6 @@ func TestFeatures_ToProto(t *testing.T) {
 			string(entitlements.OIDC):                       {Enabled: true},
 			string(entitlements.OktaSCIM):                   {Enabled: true},
 			string(entitlements.OktaUserSync):               {Enabled: true},
-			string(entitlements.Policy):                     {Enabled: true},
 			string(entitlements.SAML):                       {Enabled: true},
 			string(entitlements.SessionLocks):               {Enabled: true},
 			string(entitlements.UpsellAlert):                {Enabled: true},
@@ -165,6 +164,7 @@ func TestFeatures_ToProto(t *testing.T) {
 			string(entitlements.AccessGraphDemoMode):        {Enabled: true},
 			string(entitlements.UnrestrictedManagedUpdates): {Enabled: true},
 			string(entitlements.ClientIPRestrictions):       {Enabled: true},
+			string(entitlements.AccessGraph):                {Enabled: true},
 		},
 		//	 Legacy Fields; remove in v18
 		Kubernetes:             true,
@@ -234,7 +234,6 @@ func TestFeatures_ToProto(t *testing.T) {
 			entitlements.OIDC:                       {Enabled: true, Limit: 0},
 			entitlements.OktaSCIM:                   {Enabled: true, Limit: 0},
 			entitlements.OktaUserSync:               {Enabled: true, Limit: 0},
-			entitlements.Policy:                     {Enabled: true, Limit: 0},
 			entitlements.SAML:                       {Enabled: true, Limit: 0},
 			entitlements.SessionLocks:               {Enabled: true, Limit: 0},
 			entitlements.UpsellAlert:                {Enabled: true, Limit: 0},
@@ -243,6 +242,7 @@ func TestFeatures_ToProto(t *testing.T) {
 			entitlements.AccessGraphDemoMode:        {Enabled: true, Limit: 0},
 			entitlements.UnrestrictedManagedUpdates: {Enabled: true, Limit: 0},
 			entitlements.ClientIPRestrictions:       {Enabled: true, Limit: 0},
+			entitlements.AccessGraph:                {Enabled: true, Limit: 0},
 		},
 	}
 

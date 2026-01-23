@@ -79,7 +79,7 @@ type Features struct {
 	// AccessGraph enables the usage of access graph.
 	// NOTE: this is a legacy flag that is currently used to signal
 	// that Access Graph integration is *enabled* on a cluster.
-	// *Access* to the feature is gated on the `Policy` flag.
+	// *Access* to the feature is gated on the `AccessGraph` flag.
 	// TODO(justinas): remove this field once "TAG enabled" status is moved to a resource in the backend.
 	AccessGraph bool
 	// AccessMonitoringConfigured contributes to the enablement of access monitoring.
@@ -168,7 +168,7 @@ func setLegacyLogic(protoF *proto.Features, f Features) {
 		CreateLimit: f.GetEntitlement(entitlements.AccessLists).Limit,
 	}
 	protoF.Policy = &proto.PolicyFeature{
-		Enabled: f.GetEntitlement(entitlements.Policy).Enabled,
+		Enabled: f.GetEntitlement(entitlements.AccessGraph).Enabled,
 	}
 }
 

@@ -45,7 +45,6 @@ const (
 	OIDC                       EntitlementKind = "OIDC"
 	OktaSCIM                   EntitlementKind = "OktaSCIM"
 	OktaUserSync               EntitlementKind = "OktaUserSync"
-	Policy                     EntitlementKind = "Policy"
 	SAML                       EntitlementKind = "SAML"
 	SessionLocks               EntitlementKind = "SessionLocks"
 	UnrestrictedManagedUpdates EntitlementKind = "UnrestrictedManagedUpdates"
@@ -54,14 +53,15 @@ const (
 	LicenseAutoUpdate          EntitlementKind = "LicenseAutoUpdate"
 	AccessGraphDemoMode        EntitlementKind = "AccessGraphDemoMode"
 	ClientIPRestrictions       EntitlementKind = "ClientIPRestrictions"
+	AccessGraph                EntitlementKind = "AccessGraph"
 )
 
 // AllEntitlements returns all Entitlements; should be 1:1 with the const declared above.
 var AllEntitlements = []EntitlementKind{
 	AccessLists, AccessMonitoring, AccessRequests, App, CloudAuditLogRetention, DB, Desktop, DeviceTrust,
 	ExternalAuditStorage, FeatureHiding, HSM, Identity, JoinActiveSessions, K8s, MobileDeviceManagement, OIDC, OktaSCIM,
-	OktaUserSync, Policy, SAML, SessionLocks, UnrestrictedManagedUpdates, UpsellAlert, UsageReporting, LicenseAutoUpdate, AccessGraphDemoMode,
-	ClientIPRestrictions,
+	OktaUserSync, SAML, SessionLocks, UnrestrictedManagedUpdates, UpsellAlert, UsageReporting, LicenseAutoUpdate, AccessGraphDemoMode,
+	ClientIPRestrictions, AccessGraph,
 }
 
 // BackfillFeatures ensures entitlements are backwards compatible.
@@ -82,7 +82,7 @@ func BackfillFeatures(features *proto.Features) {
 	features.Entitlements[string(JoinActiveSessions)] = &proto.EntitlementInfo{Enabled: features.GetJoinActiveSessions()}
 	features.Entitlements[string(MobileDeviceManagement)] = &proto.EntitlementInfo{Enabled: features.GetMobileDeviceManagement()}
 	features.Entitlements[string(OIDC)] = &proto.EntitlementInfo{Enabled: features.GetOIDC()}
-	features.Entitlements[string(Policy)] = &proto.EntitlementInfo{Enabled: features.GetPolicy().GetEnabled()}
+	features.Entitlements[string(AccessGraph)] = &proto.EntitlementInfo{Enabled: features.GetAccessGraph()}
 	features.Entitlements[string(SAML)] = &proto.EntitlementInfo{Enabled: features.GetSAML()}
 	features.Entitlements[string(K8s)] = &proto.EntitlementInfo{Enabled: features.GetKubernetes()}
 	features.Entitlements[string(App)] = &proto.EntitlementInfo{Enabled: features.GetApp()}
