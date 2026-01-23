@@ -39,7 +39,7 @@ VM. You will need to adjust paths, ports, and domains for other environments.
 
 ## Step 1/7. Install the Event Handler plugin
 
-The Teleport event handler runs alongside the Fluentd forwarder, receives events
+The Teleport Event Handler runs alongside the Fluentd forwarder, receives events
 from Teleport's events API, and forwards them to Fluentd.
 
 (!docs/pages/includes/install-event-handler.mdx!)
@@ -211,7 +211,9 @@ environment.
 
 (!docs/pages/includes/plugins/finish-event-handler-config.mdx!)
 
-Next, modify the configuration file as follows:
+Update the configuration file as follows. If you are using the `teleport-plugin-event-handler`
+Helm chart with Teleport Kubernetes Operator enabled, you can ignore this step, as we
+replaced the `teleport` section with the `crd` and `tbot` sections.
 
 (!docs/pages/includes/plugins/config-toml-teleport.mdx!)
 

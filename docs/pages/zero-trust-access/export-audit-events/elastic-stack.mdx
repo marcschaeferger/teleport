@@ -415,9 +415,9 @@ your Logstash `http` input earlier, `https://localhost:9601`. Change
 `forward.fluentd.session-url` to the same value with the root URL path:
 `https://localhost:9601/`.
 
-Change `teleport.addr` to the host and port of your Teleport Proxy Service, or
-the Auth Service if you have configured the Event Handler to connect to it
-directly, e.g., `mytenant.teleport.sh:443`.
+If you are using the `teleport-plugin-event-handler`
+Helm chart with Teleport Kubernetes Operator enabled, you can ignore the below step, as we
+replaced the `teleport` section with the `crd` and `tbot` sections.
 
 (!docs/pages/includes/plugins/config-toml-teleport.mdx!)
 

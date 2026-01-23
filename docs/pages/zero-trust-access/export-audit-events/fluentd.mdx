@@ -1,7 +1,7 @@
 ---
 title: Export Events with Fluentd
 sidebar_label: Fluentd
-description: Forwarding events with Fluentd and Teleport event handler
+description: Forwarding events with Fluentd and Teleport Event Handler
 videoBanner: HAqxs4rBv2c
 tags:
  - how-to
@@ -20,7 +20,7 @@ using Fluentd as the target service.
 
 ## How it works
 
-The Teleport event handler runs alongside the Fluentd forwarder, receives events
+The Teleport Event Handler runs alongside the Fluentd forwarder, receives events
 from Teleport's events API, and forwards them to Fluentd.
 
 We'll create a local Docker container as a destination for the Event Handler:
@@ -50,24 +50,30 @@ to integrate with your infrastructure.
   $ cd event-handler
   ```
 
-## Step 1/6. Install the event handler plugin
+## Step 1/4. Install the Event Handler plugin
 
 (!docs/pages/includes/install-event-handler.mdx!)
 
-## Step 2/6. Generate a plugin configuration
+## Step 2/4. Configure the Event Handler plugin
+
+### Generate a starter config file
 
 (!docs/pages/includes/configure-event-handler.mdx!)
 
 If you have an existing Fluentd setup with TLS, issue a client certificate and
 key from the same certificate authority for the Teleport Event Handler to use.
 
-## Step 3/6. Create a user and role for reading audit events
+### Define RBAC resources and issue credentials for the Event Handler role
 
+The Teleport Event Handler needs credentials to authenticate to the Teleport
+Auth Service. In this section, you will give the Event Handler access to these
+credentials.
+
+<Tabs>
+<TabItem label="tctl">
 (!docs/pages/includes/plugins/event-handler-role-user.mdx!)
 
-## Step 4/6. Create teleport-event-handler credentials
-
-### Enable issuing of credentials for the event handler role
+### Enable issuing of credentials for the Event Handler role
 
 <Tabs>
 <TabItem label="Machine & Workload Identity">
@@ -78,7 +84,7 @@ key from the same certificate authority for the Teleport Event Handler to use.
 </TabItem>
 </Tabs>
 
-### Export an identity file for the Fluentd plugin user
+### Export an identity file for the Event Handler plugin user
 
 Give the plugin access to a Teleport identity file. We recommend using Machine
 ID for this in order to produce short-lived identity files that are less
@@ -94,7 +100,13 @@ longer-lived identity files with `tctl`:
 </TabItem>
 </Tabs>
 
-## Step 5/6. Start the Fluentd forwarder
+</TabItem>
+<TabItem label="Kubernetes Operator">
+(!docs/pages/includes/plugins/operator-crd-config.mdx plugin="teleport-plugin-event-handler"!)
+</TabItem>
+</Tabs>
+
+## Step 3/4. Start the Fluentd forwarder
 
 The Fluentd plugin will send events to your Fluentd instance using keys
 generated on the previous step.
@@ -157,7 +169,7 @@ $ docker run -u $(id -u ${USER}):$(id -g ${USER}) -p 8888:8888 -v $(pwd):/keys -
 
 This will consume your current terminal, so open a new one to continue following along.
 
-## Step 6/6. Run the Event Handler plugin
+## Step 4/4. Run the Event Handler plugin
 
 ### Configure the Event Handler
 
@@ -166,7 +178,9 @@ environment.
 
 (!docs/pages/includes/plugins/finish-event-handler-config.mdx!)
 
-Next, modify the configuration file as follows:
+Update the configuration file as follows. If you are using the `teleport-plugin-event-handler`
+Helm chart with Teleport Kubernetes Operator enabled, you can ignore this step, as we
+replaced the `teleport` section with the `crd` and `tbot` sections.
 
 (!docs/pages/includes/plugins/config-toml-teleport.mdx!)
 

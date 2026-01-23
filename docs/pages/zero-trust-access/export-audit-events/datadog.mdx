@@ -51,19 +51,24 @@ from Teleport's events API, and forwards them to Fluentd.
 
 (!docs/pages/includes/install-event-handler.mdx!)
 
-## Step 2/6. Generate a plugin configuration
+## Step 2/4. Configure the Event Handler plugin
+
+### Generate a starter config file
 
 (!docs/pages/includes/configure-event-handler.mdx!)
 
-## Step 3/6. Create a user and role for reading audit events
+If you have an existing Fluentd setup with TLS, issue a client certificate and
+key from the same certificate authority for the Teleport Event Handler to use.
 
-(!docs/pages/includes/plugins/event-handler-role-user.mdx!)
-
-## Step 4/6. Create teleport-event-handler credentials
+### Define RBAC resources and issue credentials for the Event Handler role
 
 The Teleport Event Handler needs credentials to authenticate to the Teleport
 Auth Service. In this section, you will give the Event Handler access to these
 credentials.
+
+<Tabs>
+<TabItem label="tctl">
+(!docs/pages/includes/plugins/event-handler-role-user.mdx!)
 
 ### Enable issuing of credentials for the Event Handler role
 
@@ -89,6 +94,12 @@ longer-lived identity files with `tctl`:
 </TabItem>
 <TabItem label="Long-lived identity files">
 (!docs/pages/includes/plugins/identity-export.mdx user="teleport-event-handler" secret="teleport-event-handler-identity"!)
+</TabItem>
+</Tabs>
+
+</TabItem>
+<TabItem label="Kubernetes Operator">
+(!docs/pages/includes/plugins/operator-crd-config.mdx plugin="teleport-plugin-event-handler"!)
 </TabItem>
 </Tabs>
 
@@ -172,7 +183,9 @@ environment.
 
 (!docs/pages/includes/plugins/finish-event-handler-config.mdx!)
 
-Next, modify the configuration file as follows:
+Update the configuration file as follows. If you are using the `teleport-plugin-event-handler`
+Helm chart with Teleport Kubernetes Operator enabled, you can ignore this step, as we
+replaced the `teleport` section with the `crd` and `tbot` sections.
 
 (!docs/pages/includes/plugins/config-toml-teleport.mdx!)
 
