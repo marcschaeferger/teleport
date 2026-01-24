@@ -148,7 +148,11 @@ $ sudo journalctl -u teleport --no-pager
 - Ensure the agent can reach the Teleport Proxy Service (firewalls, security groups).
 - Ensure system time is synchronized (for example, using `chronyd` or `systemd-timesyncd`).  
   Clock skew can prevent agents from joining. Look for "clock skew detected" or certificate 
-  validity errors in the logs, and run `timedatectl timesync-status` to verify system time is 
+  validity errors in the logs, and run 
+  ```code
+  $ timedatectl timesync-status
+  ```
+   to verify system time is 
   correct and NTP is active. The output `System clock synchronized: yes` indicates the system clock has 
   successfully synced with a time source.
 - On SELinux systems, check for denied operations:
