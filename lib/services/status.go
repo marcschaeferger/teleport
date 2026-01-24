@@ -44,7 +44,7 @@ type Status interface {
 }
 
 // TODO: william-tel delete this once e/lib/licensechecker uses the new DeleteClusterAlerts function
-// Move GetClusterAlerts and UpsertCluster back to Status interface once all usages of StatusInternal are removed in e/lib/licensechecker s-
+// Move GetClusterAlerts and UpsertCluster back to Status interface once all usages of StatusInternal are removed in e/lib/licensechecker
 type StatusInternal interface {
 
 	// GetClusterAlerts loads all matching cluster alerts.
