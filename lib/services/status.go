@@ -27,11 +27,6 @@ import (
 
 // Status defines an interface for managing cluster status info.
 type Status interface {
-	// GetClusterAlerts loads all matching cluster alerts.
-	GetClusterAlerts(ctx context.Context, query types.GetClusterAlertsRequest) ([]types.ClusterAlert, error)
-
-	// UpsertClusterAlert creates the specified alert, overwriting any preexisting alert with the same ID.
-	UpsertClusterAlert(ctx context.Context, alert types.ClusterAlert) error
 
 	// CreateAlertAck marks a cluster alert as acknowledged.
 	CreateAlertAck(ctx context.Context, ack types.AlertAcknowledgement) error
@@ -44,12 +39,20 @@ type Status interface {
 
 	// DeleteClusterAlerts deletes cluster alerts matching the request.
 	DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error
+
+	StatusInternal
 }
 
 // TODO: william-tel delete this once e/lib/licensechecker uses the new DeleteClusterAlerts function
+// Move GetClusterAlerts and UpsertCluster back to Status interface once all usages of StatusInternal are removed in e/lib/licensechecker s-
 type StatusInternal interface {
-	Status
 
-	// DeleteClusterAlert deletes the specified cluster alert by ID.
+	// GetClusterAlerts loads all matching cluster alerts.
+	GetClusterAlerts(ctx context.Context, query types.GetClusterAlertsRequest) ([]types.ClusterAlert, error)
+
+	// UpsertClusterAlert creates the specified alert, overwriting any preexisting alert with the same ID.
+	UpsertClusterAlert(ctx context.Context, alert types.ClusterAlert) error
+
+	// DeleteClusterAlert deletes the specified cluster alert by ID.S
 	DeleteClusterAlert(ctx context.Context, alertID string) error
 }

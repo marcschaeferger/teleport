@@ -4996,6 +4996,14 @@ func (c *Client) UpsertClusterAlert(ctx context.Context, alert types.ClusterAler
 	return trace.Wrap(err)
 }
 
+// TODO william-tel remove when DeleteClusterAlerts is used everywhere.
+func (c *Client) DeleteClusterAlert(ctx context.Context, id string) error {
+	_, err := c.grpc.DeleteClusterAlerts(ctx, &proto.DeleteClusterAlertRequest{
+		AlertID: id,
+	})
+	return trace.Wrap(err)
+}
+
 func (c *Client) DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error {
 	_, err := c.grpc.DeleteClusterAlerts(ctx, &req)
 	return trace.Wrap(err)

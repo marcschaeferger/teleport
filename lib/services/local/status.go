@@ -147,6 +147,11 @@ func (s *StatusService) UpsertClusterAlert(ctx context.Context, alert types.Clus
 	return trace.Wrap(err)
 }
 
+// TODO: william-tel delete this once e/lib/licensechecker uses the new DeleteClusterAlerts function
+func (s *StatusService) DeleteClusterAlert(ctx context.Context, alertID string) error {
+	return s.DeleteClusterAlerts(ctx, proto.DeleteClusterAlertRequest{AlertID: alertID})
+}
+
 func (s *StatusService) DeleteClusterAlerts(ctx context.Context, req proto.DeleteClusterAlertRequest) error {
 	if req.AlertID == "" {
 		return trace.BadParameter("missing alert id for deletion")
