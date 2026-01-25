@@ -1,0 +1,170 @@
+name: Build Teleport images and push to GHCR
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build (tag/branch/SHA). Empty = current ref."
+        required: false
+        default: ""
+      version_tag:
+        description: "Image tag to publish (e.g., 18.6.4). Empty = derive from git tag or SHA."
+        required: false
+        default: ""
+      push:
+        description: "Push images to GHCR (true/false)"
+        required: true
+        default: "false"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # Target namespace on GHCR. By default, publish under the repo owner.
+  # If your fork is under an org, this will be that org.
+  GHCR_OWNER: ${{ github.repository_owner }}
+
+  # Repo names to publish (match upstream naming conventions)
+  REPO_TELEPORT_DISTROLESS: teleport-distroless
+  REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
+  REPO_TBOT_DISTROLESS: tbot-distroless
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Compute image tag
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${{ inputs.version_tag }}" ]]; then
+            TAG="${{ inputs.version_tag }}"
+          else
+            REF_NAME="${GITHUB_REF_NAME:-}"
+            if [[ "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+              TAG="${REF_NAME#v}"
+            else
+              TAG="$(echo "${GITHUB_SHA}" | cut -c1-12)"
+            fi
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Using image tag: ${TAG}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker build cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Teleport binaries (dockerized build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C build.assets build-binaries
+
+      - name: Build Teleport Docker images
+        shell: bash
+        run: |
+          set -euo pipefail
+          make docker
+
+      - name: Identify locally built images
+        id: images
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Local images:"
+          docker images --format '  - {{.Repository}}:{{.Tag}}'
+
+          find_image () {
+            local suffix="$1"
+            docker images --format '{{.Repository}}:{{.Tag}}' | grep -E "${suffix}(:|$)" | head -n1 || true
+          }
+
+          TELEPORT_DISTROLESS_LOCAL="$(find_image 'teleport-distroless')"
+          TELEPORT_DISTROLESS_DEBUG_LOCAL="$(find_image 'teleport-distroless-debug')"
+          TBOT_DISTROLESS_LOCAL="$(find_image 'tbot-distroless')"
+
+          echo "teleport_distroless_local=${TELEPORT_DISTROLESS_LOCAL}" >> "$GITHUB_OUTPUT"
+          echo "teleport_distroless_debug_local=${TELEPORT_DISTROLESS_DEBUG_LOCAL}" >> "$GITHUB_OUTPUT"
+          echo "tbot_distroless_local=${TBOT_DISTROLESS_LOCAL}" >> "$GITHUB_OUTPUT"
+
+          if [[ -z "${TELEPORT_DISTROLESS_LOCAL}" ]]; then
+            echo "ERROR: Could not locate a locally built teleport-distroless image."
+            echo "Adjust the grep filters in find_image() to match the actual local image names produced by your fork."
+            exit 1
+          fi
+
+      - name: Log in to GHCR (only when pushing)
+        if: ${{ inputs.push == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Tag images for GHCR
+        if: ${{ inputs.push == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.tag }}"
+
+          T1="ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS}:${TAG}"
+          T2="ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS_DEBUG}:${TAG}"
+          T3="ghcr.io/${GHCR_OWNER}/${REPO_TBOT_DISTROLESS}:${TAG}"
+
+          echo "Tagging:"
+          echo "  ${T1}"
+          docker tag "${{ steps.images.outputs.teleport_distroless_local }}" "${T1}"
+
+          if [[ -n "${{ steps.images.outputs.teleport_distroless_debug_local }}" ]]; then
+            echo "  ${T2}"
+            docker tag "${{ steps.images.outputs.teleport_distroless_debug_local }}" "${T2}"
+          else
+            echo "WARN: teleport-distroless-debug local image not found; skipping."
+          fi
+
+          if [[ -n "${{ steps.images.outputs.tbot_distroless_local }}" ]]; then
+            echo "  ${T3}"
+            docker tag "${{ steps.images.outputs.tbot_distroless_local }}" "${T3}"
+          else
+            echo "WARN: tbot-distroless local image not found; skipping."
+          fi
+
+      - name: Push images to GHCR
+        if: ${{ inputs.push == 'true' || startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.vars.outputs.tag }}"
+
+          docker push "ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS}:${TAG}"
+
+          # Optional images:
+          docker push "ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS_DEBUG}:${TAG}" || true
+          docker push "ghcr.io/${GHCR_OWNER}/${REPO_TBOT_DISTROLESS}:${TAG}" || true
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "Built tag: ${{ steps.vars.outputs.tag }}"
+          echo "Pushed: ${{ inputs.push }} (or tag build push on v*)"
