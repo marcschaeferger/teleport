@@ -24,7 +24,7 @@ on:
         required: true
         default: "fsn1"
       image:
-        description: "Hetzner OS image (e.g., ubuntu-24.04, rocky-9)."
+        description: "Hetzner OS image (Ubuntu only, e.g., ubuntu-24.04)."
         required: true
         default: "ubuntu-24.04"
   push:
@@ -70,53 +70,16 @@ jobs:
           location: ${{ inputs.location }}
           image: ${{ inputs.image }}
 
-          # Optional (recommended): provide SSH key ID to avoid root password mail.
-          # ssh_key: ${{ secrets.HCLOUD_SSH_KEY_ID }}
-
-          # Pre-runner bootstrap: install Docker + basic toolchain needed by Teleport build targets
+          # Ubuntu-only: keep this minimal and deterministic
           pre_runner_script: |
             set -euo pipefail
-
             echo "=== OS info ==="
             cat /etc/os-release || true
             uname -a || true
 
-            echo "=== Installing base dependencies (git, make, docker) ==="
-            if command -v apt-get >/dev/null 2>&1; then
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update -y
-              # build-essential ensures make + toolchain basics
-              apt-get install -y --no-install-recommends \
-                ca-certificates curl git jq \
-                build-essential \
-                docker.io docker-buildx-plugin docker-compose-plugin \
-                coreutils util-linux
-              systemctl enable --now docker
-            elif command -v dnf >/dev/null 2>&1; then
-              dnf install -y git make jq ca-certificates curl docker
-              systemctl enable --now docker
-              systemctl start docker
-            elif command -v zypper >/dev/null 2>&1; then
-              zypper --non-interactive refresh
-              zypper --non-interactive install git make jq ca-certificates curl docker
-              systemctl enable --now docker
-              systemctl start docker
-            else
-              echo "ERROR: No supported package manager found (apt-get/dnf/zypper)."
-              exit 1
-            fi
-
-            echo "=== Verifying tools ==="
-            command -v make
-            command -v git
-            command -v docker
-
-            docker version
-
-            echo "=== /tmp setup ==="
+            echo "=== Ensure /tmp exists ==="
             mkdir -p /tmp
             chmod 1777 /tmp
-
 
   build-and-push:
     name: Build Teleport images on Hetzner runner
@@ -124,23 +87,43 @@ jobs:
     runs-on: ${{ needs.create-runner.outputs.label }}
 
     steps:
-      - name: Verify runner toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Runner OS:"
-          cat /etc/os-release || true
-          echo "Tools:"
-          command -v make
-          command -v git
-          command -v docker
-          docker version
-          df -h
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Install dependencies (Ubuntu only)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Runner OS:"
+          cat /etc/os-release || true
+
+          # Ubuntu cloud images can hold apt locks for a short time
+          if command -v cloud-init >/dev/null 2>&1; then
+            echo "Waiting for cloud-init..."
+            sudo cloud-init status --wait || true
+          fi
+
+          echo "Installing required packages..."
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl git jq \
+            build-essential \
+            docker.io docker-buildx-plugin docker-compose-plugin
+
+          echo "Enable/start Docker..."
+          sudo systemctl enable --now docker
+
+          # Allow the runner user to use Docker immediately in this job
+          sudo chmod 666 /var/run/docker.sock
+
+          echo "Verify tools..."
+          make --version
+          git --version
+          docker version
+          df -h
 
       - name: Compute image tag
         id: vars
