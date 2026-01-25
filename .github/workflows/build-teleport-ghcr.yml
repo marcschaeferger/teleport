@@ -42,7 +42,7 @@ env:
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
 
-  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp to avoid HOME/GOMODCACHE issues.
+  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp.
   HOME: /tmp
   GOPATH: /tmp/go
   GOMODCACHE: /tmp/gomodcache
@@ -64,20 +64,11 @@ jobs:
           mode: create
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-
-          # Sizing/location/OS
           server_type: ${{ inputs.server_type }}
           location: ${{ inputs.location }}
           image: ${{ inputs.image }}
-
-          # Ubuntu-only: keep this minimal and deterministic
           pre_runner_script: |
             set -euo pipefail
-            echo "=== OS info ==="
-            cat /etc/os-release || true
-            uname -a || true
-
-            echo "=== Ensure /tmp exists ==="
             mkdir -p /tmp
             chmod 1777 /tmp
 
@@ -92,7 +83,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Install dependencies (Ubuntu only)
+      - name: Install dependencies (Ubuntu only, no cloud-init)
         shell: bash
         run: |
           set -euo pipefail
@@ -100,11 +91,27 @@ jobs:
           echo "Runner OS:"
           cat /etc/os-release || true
 
-          # Ubuntu cloud images can hold apt locks for a short time
-          if command -v cloud-init >/dev/null 2>&1; then
-            echo "Waiting for cloud-init..."
-            sudo cloud-init status --wait || true
-          fi
+          # Wait for apt/dpkg locks without relying on cloud-init.
+          wait_for_lock () {
+            local lock="$1"
+            local max_seconds="${2:-300}"  # 5 min
+            local waited=0
+            while sudo fuser "$lock" >/dev/null 2>&1; do
+              if (( waited >= max_seconds )); then
+                echo "ERROR: Timeout waiting for lock: $lock"
+                sudo fuser -v "$lock" || true
+                return 1
+              fi
+              echo "Waiting for lock $lock..."
+              sleep 5
+              waited=$((waited+5))
+            done
+          }
+
+          # These are the common lock files on Ubuntu/Debian.
+          wait_for_lock /var/lib/dpkg/lock-frontend 300 || true
+          wait_for_lock /var/lib/apt/lists/lock 300 || true
+          wait_for_lock /var/cache/apt/archives/lock 300 || true
 
           echo "Installing required packages..."
           sudo apt-get update -y
@@ -116,7 +123,7 @@ jobs:
           echo "Enable/start Docker..."
           sudo systemctl enable --now docker
 
-          # Allow the runner user to use Docker immediately in this job
+          # Allow runner user to use Docker immediately (ephemeral runner => acceptable)
           sudo chmod 666 /var/run/docker.sock
 
           echo "Verify tools..."
