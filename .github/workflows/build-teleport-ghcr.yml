@@ -16,9 +16,9 @@ on:
         required: true
         default: "false"
       server_type:
-        description: "Hetzner server type (e.g., cpx41, ccx33)."
+        description: "Hetzner server type (e.g., cpx42, ccx33)."
         required: true
-        default: "cpx41"
+        default: "cpx42"
       location:
         description: "Hetzner location (e.g., fsn1, nbg1)."
         required: true
