@@ -74,6 +74,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
+      - name: Prepare Go build caches for build.assets containers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/go-build-cache" "${RUNNER_TEMP}/gomodcache"
+          echo "GOCACHE=${RUNNER_TEMP}/go-build-cache" >> "${GITHUB_ENV}"
+          echo "GOMODCACHE=${RUNNER_TEMP}/gomodcache" >> "${GITHUB_ENV}"
+
       - name: Build Teleport binaries (dockerized build)
         shell: bash
         run: |
