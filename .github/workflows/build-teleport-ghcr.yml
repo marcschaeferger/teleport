@@ -42,7 +42,6 @@ env:
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
 
-  # Build.assets containers mount /tmp:/tmp. Keep all caches under /tmp.
   HOME: /tmp
   GOPATH: /tmp/go
   GOMODCACHE: /tmp/gomodcache
@@ -93,18 +92,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Runner OS:"
-          cat /etc/os-release || true
 
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             ca-certificates curl gnupg lsb-release \
             git jq \
             build-essential pkg-config \
-            rsync unzip tar xz-utils \
-            uidmap
+            rsync unzip tar xz-utils
 
-          # Docker official repo (ensures buildx/compose plugin packages exist)
+          # Docker official repo (ensures docker-buildx-plugin + docker-compose-plugin exist)
           sudo install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
           sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -120,8 +116,6 @@ jobs:
             docker-buildx-plugin docker-compose-plugin
 
           sudo systemctl enable --now docker
-
-          # Make docker usable immediately in this job
           sudo chmod 666 /var/run/docker.sock
 
           echo "Verify toolchain:"
@@ -139,29 +133,16 @@ jobs:
           mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
           chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
 
-          # Protect against the old ":/go/cache" empty-host-path bug
-          test -n "/tmp/go-build-cache"
-          test -d /tmp/go-build-cache
-
-          df -h
-
-      - name: Ensure non-root UID/GID for buildbox builds
+      - name: Compute build UID/GID (force non-root)
+        id: ug
         shell: bash
         run: |
           set -euo pipefail
-          echo "whoami: $(whoami)"
-          echo "id -u: $(id -u)"
-          echo "id -g: $(id -g)"
-
-          # buildbox Dockerfiles create a 'ci' user using these args; UID=0 breaks (root already exists).
-          if [[ "$(id -u)" == "0" ]]; then
-            echo "Runner is root -> forcing UID/GID to 1000:1000"
-            echo "UID=1000" >> "$GITHUB_ENV"
-            echo "GID=1000" >> "$GITHUB_ENV"
-          else
-            echo "UID=$(id -u)" >> "$GITHUB_ENV"
-            echo "GID=$(id -g)" >> "$GITHUB_ENV"
-          fi
+          # Buildbox Dockerfiles cannot create ci user with UID 0 (root already exists).
+          # Force a safe, stable UID/GID for docker build args.
+          echo "build_uid=1000" >> "$GITHUB_OUTPUT"
+          echo "build_gid=1000" >> "$GITHUB_OUTPUT"
+          echo "Using BUILD_UID=1000 BUILD_GID=1000"
 
       - name: Compute image tag
         id: vars
@@ -181,14 +162,6 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using image tag: ${TAG}"
 
-      - name: Free disk before big docker builds
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker system df || true
-          docker system prune -af --volumes || true
-          df -h
-
       - name: Build buildbox images locally (NO pulls)
         shell: bash
         env:
@@ -197,15 +170,31 @@ jobs:
           GOMODCACHE: /tmp/gomodcache
           GOCACHE: /tmp/go-build-cache
           XDG_CACHE_HOME: /tmp/.cache
-          UID: ${{ env.UID }}
-          GID: ${{ env.GID }}
         run: |
           set -euo pipefail
-          echo "Using UID=${UID} GID=${GID}"
-          # Build all buildbox images needed by build.assets (no upstream pulls)
-          make -C build.assets buildbox-node
-          make -C build.assets buildbox-centos7-assets
-          make -C build.assets buildbox-centos7
+
+          BUILD_UID="${{ steps.ug.outputs.build_uid }}"
+          BUILD_GID="${{ steps.ug.outputs.build_gid }}"
+
+          # Defensive: if NODE_VERSION is not defined by the repo's Makefile, set a sane default.
+          # If your Teleport branch requires a different version, override later.
+          NODE_VERSION_DEFAULT="20"
+
+          echo "Building buildbox-node with UID=${BUILD_UID} GID=${BUILD_GID}"
+          make -C build.assets \
+            UID="${BUILD_UID}" GID="${BUILD_GID}" \
+            NODE_VERSION="${NODE_VERSION_DEFAULT}" \
+            buildbox-node
+
+          echo "Building buildbox-centos7-assets with UID=${BUILD_UID} GID=${BUILD_GID}"
+          make -C build.assets \
+            UID="${BUILD_UID}" GID="${BUILD_GID}" \
+            buildbox-centos7-assets
+
+          echo "Building buildbox-centos7 with UID=${BUILD_UID} GID=${BUILD_GID}"
+          make -C build.assets \
+            UID="${BUILD_UID}" GID="${BUILD_GID}" \
+            buildbox-centos7
 
       - name: Build Teleport binaries (dockerized build)
         shell: bash
@@ -215,12 +204,11 @@ jobs:
           GOMODCACHE: /tmp/gomodcache
           GOCACHE: /tmp/go-build-cache
           XDG_CACHE_HOME: /tmp/.cache
-          UID: ${{ env.UID }}
-          GID: ${{ env.GID }}
         run: |
           set -euo pipefail
-          echo "Using UID=${UID} GID=${GID}"
-          make -C build.assets build-binaries
+          BUILD_UID="${{ steps.ug.outputs.build_uid }}"
+          BUILD_GID="${{ steps.ug.outputs.build_gid }}"
+          make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" build-binaries
 
       - name: Build Teleport Docker images
         shell: bash
@@ -239,7 +227,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "Local images:"
           docker images --format '  - {{.Repository}}:{{.Tag}}'
 
           find_image () {
