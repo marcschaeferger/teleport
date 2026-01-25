@@ -82,6 +82,27 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Normalize go directive in all go.mod files (X.Y.Z -> X.Y)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "go.mod before:"
+          sed -n '1,6p' go.mod || true
+
+          while IFS= read -r -d '' f; do
+            perl -0777 -pe 's/^(go\s+\d+\.\d+)\.\d+(\s*)$/$1$2/m' -i "$f"
+          done < <(find . -name go.mod -print0)
+
+          echo "go.mod after:"
+          sed -n '1,6p' go.mod || true
+
+      - name: Fix workspace permissions for UID 1000 (required for webassets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
+          sudo chmod -R u+rwX,g+rwX "$GITHUB_WORKSPACE"
+
       - name: Set up Go (host)
         uses: actions/setup-go@v5
         with:
@@ -138,8 +159,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Buildbox Dockerfiles cannot create ci user with UID 0 (root already exists).
-          # Force a safe, stable UID/GID for docker build args.
           echo "build_uid=1000" >> "$GITHUB_OUTPUT"
           echo "build_gid=1000" >> "$GITHUB_OUTPUT"
           echo "Using BUILD_UID=1000 BUILD_GID=1000"
