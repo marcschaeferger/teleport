@@ -162,7 +162,7 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using image tag: ${TAG}"
 
-      - name: Build buildbox images locally (NO pulls)
+      - name: Build buildbox images locally (NO pulls, robust targets)
         shell: bash
         env:
           HOME: /tmp
@@ -175,26 +175,66 @@ jobs:
 
           BUILD_UID="${{ steps.ug.outputs.build_uid }}"
           BUILD_GID="${{ steps.ug.outputs.build_gid }}"
-
-          # Defensive: if NODE_VERSION is not defined by the repo's Makefile, set a sane default.
-          # If your Teleport branch requires a different version, override later.
           NODE_VERSION_DEFAULT="20"
 
-          echo "Building buildbox-node with UID=${BUILD_UID} GID=${BUILD_GID}"
+          echo "=== build.assets dir ==="
+          ls -la build.assets
+
+          echo "=== Available make targets (filtered) ==="
+          make -C build.assets -qp 2>/dev/null | awk -F: '/^[a-zA-Z0-9_.-]+:([^=]|$)/{print $1}' | sort -u | \
+            egrep -i 'build(box)?-(node|centos7|assets)|centos7.*assets|assets.*centos7' || true
+
+          echo "=== Build buildbox-node ==="
           make -C build.assets \
             UID="${BUILD_UID}" GID="${BUILD_GID}" \
             NODE_VERSION="${NODE_VERSION_DEFAULT}" \
             buildbox-node
 
-          echo "Building buildbox-centos7-assets with UID=${BUILD_UID} GID=${BUILD_GID}"
-          make -C build.assets \
-            UID="${BUILD_UID}" GID="${BUILD_GID}" \
-            buildbox-centos7-assets
+          echo "=== Build CentOS7 assets image (target detection or docker build) ==="
+          ASSETS_IMAGE="teleport-buildbox-centos7-assets:local"
 
-          echo "Building buildbox-centos7 with UID=${BUILD_UID} GID=${BUILD_GID}"
-          make -C build.assets \
-            UID="${BUILD_UID}" GID="${BUILD_GID}" \
-            buildbox-centos7
+          if make -C build.assets -n buildbox-centos7-assets >/dev/null 2>&1; then
+            echo "Using make target: buildbox-centos7-assets"
+            make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" buildbox-centos7-assets
+            ASSETS_IMAGE=""
+          elif make -C build.assets -n build-centos7-assets >/dev/null 2>&1; then
+            echo "Using make target: build-centos7-assets"
+            make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" build-centos7-assets
+            ASSETS_IMAGE=""
+          else
+            echo "No make target for centos7 assets found. Building via docker buildx."
+            if [[ -f build.assets/Dockerfile-centos7-assets ]]; then
+              DF="Dockerfile-centos7-assets"
+            elif [[ -f build.assets/Dockerfile-centos7-assets-image ]]; then
+              DF="Dockerfile-centos7-assets-image"
+            elif [[ -f build.assets/Dockerfile-centos7-assets.dockerfile ]]; then
+              DF="Dockerfile-centos7-assets.dockerfile"
+            else
+              echo "ERROR: Could not find a Dockerfile for centos7 assets in build.assets/"
+              echo "Files:"
+              ls -la build.assets
+              exit 1
+            fi
+
+            docker buildx build \
+              --load \
+              -f "build.assets/${DF}" \
+              -t "${ASSETS_IMAGE}" \
+              build.assets
+          fi
+
+          echo "=== Build buildbox-centos7 ==="
+          if [[ -n "${ASSETS_IMAGE}" ]]; then
+            echo "Using BUILDBOX_CENTOS7_ASSETS=${ASSETS_IMAGE}"
+            make -C build.assets \
+              UID="${BUILD_UID}" GID="${BUILD_GID}" \
+              BUILDBOX_CENTOS7_ASSETS="${ASSETS_IMAGE}" \
+              buildbox-centos7
+          else
+            make -C build.assets \
+              UID="${BUILD_UID}" GID="${BUILD_GID}" \
+              buildbox-centos7
+          fi
 
       - name: Build Teleport binaries (dockerized build)
         shell: bash
