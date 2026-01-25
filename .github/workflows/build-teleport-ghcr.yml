@@ -42,7 +42,7 @@ env:
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
 
-  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp.
+  # Build.assets containers mount /tmp:/tmp. Keep all caches under /tmp.
   HOME: /tmp
   GOPATH: /tmp/go
   GOMODCACHE: /tmp/gomodcache
@@ -83,33 +83,28 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      # Install Go first (host dependency for some build.assets/tooling steps)
       - name: Set up Go (host)
         uses: actions/setup-go@v5
         with:
-          # Uses the repo's go.mod version automatically
           go-version-file: go.mod
           cache: false
 
-      - name: Install ALL required dependencies (Ubuntu only)
+      - name: Install ALL host dependencies (Ubuntu only)
         shell: bash
         run: |
           set -euo pipefail
-          echo "OS:"
+          echo "Runner OS:"
           cat /etc/os-release || true
 
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             ca-certificates curl gnupg lsb-release \
             git jq \
-            build-essential \
-            pkg-config \
-            rsync \
-            unzip \
-            tar \
-            xz-utils
+            build-essential pkg-config \
+            rsync unzip tar xz-utils \
+            uidmap
 
-          # Docker official repo (ensures docker-buildx-plugin + docker-compose-plugin exist)
+          # Docker official repo (ensures buildx/compose plugin packages exist)
           sudo install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
           sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -125,23 +120,48 @@ jobs:
             docker-buildx-plugin docker-compose-plugin
 
           sudo systemctl enable --now docker
+
+          # Make docker usable immediately in this job
           sudo chmod 666 /var/run/docker.sock
 
-          echo "Verify:"
+          echo "Verify toolchain:"
           go version
           make --version
-          gcc --version
           docker version
           docker buildx version
-          docker compose version
+          docker compose version || true
           df -h
 
-      - name: Prepare writable cache dirs for buildbox containers
+      - name: Prepare writable cache dirs (/tmp)
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
           chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+
+          # Protect against the old ":/go/cache" empty-host-path bug
+          test -n "/tmp/go-build-cache"
+          test -d /tmp/go-build-cache
+
+          df -h
+
+      - name: Ensure non-root UID/GID for buildbox builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "whoami: $(whoami)"
+          echo "id -u: $(id -u)"
+          echo "id -g: $(id -g)"
+
+          # buildbox Dockerfiles create a 'ci' user using these args; UID=0 breaks (root already exists).
+          if [[ "$(id -u)" == "0" ]]; then
+            echo "Runner is root -> forcing UID/GID to 1000:1000"
+            echo "UID=1000" >> "$GITHUB_ENV"
+            echo "GID=1000" >> "$GITHUB_ENV"
+          else
+            echo "UID=$(id -u)" >> "$GITHUB_ENV"
+            echo "GID=$(id -g)" >> "$GITHUB_ENV"
+          fi
 
       - name: Compute image tag
         id: vars
@@ -161,9 +181,32 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using image tag: ${TAG}"
 
-      # IMPORTANT:
-      # Use the upstream build.assets flow, but avoid building buildbox images locally.
-      # On amd64 Ubuntu runner, Teleport expects to *use* existing buildbox images, not cross-build them.
+      - name: Free disk before big docker builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker system df || true
+          docker system prune -af --volumes || true
+          df -h
+
+      - name: Build buildbox images locally (NO pulls)
+        shell: bash
+        env:
+          HOME: /tmp
+          GOPATH: /tmp/go
+          GOMODCACHE: /tmp/gomodcache
+          GOCACHE: /tmp/go-build-cache
+          XDG_CACHE_HOME: /tmp/.cache
+          UID: ${{ env.UID }}
+          GID: ${{ env.GID }}
+        run: |
+          set -euo pipefail
+          echo "Using UID=${UID} GID=${GID}"
+          # Build all buildbox images needed by build.assets (no upstream pulls)
+          make -C build.assets buildbox-node
+          make -C build.assets buildbox-centos7-assets
+          make -C build.assets buildbox-centos7
+
       - name: Build Teleport binaries (dockerized build)
         shell: bash
         env:
@@ -172,15 +215,11 @@ jobs:
           GOMODCACHE: /tmp/gomodcache
           GOCACHE: /tmp/go-build-cache
           XDG_CACHE_HOME: /tmp/.cache
+          UID: ${{ env.UID }}
+          GID: ${{ env.GID }}
         run: |
           set -euo pipefail
-
-          # Ensure buildbox images exist (they are published by upstream)
-          # If your fork references different tags, adjust TELEPORT_VERSION as needed.
-          # This step prevents Make from trying to build buildbox images.
-          docker pull ghcr.io/gravitational/teleport-buildbox-centos7:teleport18-amd64
-          docker pull ghcr.io/gravitational/teleport-buildbox-node:teleport18-amd64
-
+          echo "Using UID=${UID} GID=${GID}"
           make -C build.assets build-binaries
 
       - name: Build Teleport Docker images
