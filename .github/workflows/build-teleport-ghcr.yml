@@ -42,7 +42,7 @@ env:
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
 
-  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp to avoid HOME/GOMODCACHE issues.
+  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp.
   HOME: /tmp
   GOPATH: /tmp/go
   GOMODCACHE: /tmp/gomodcache
@@ -64,13 +64,9 @@ jobs:
           mode: create
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-
-          # Sizing/location/OS
           server_type: ${{ inputs.server_type }}
           location: ${{ inputs.location }}
           image: ${{ inputs.image }}
-
-          # Pre-runner bootstrap: keep minimal (install is done in the job)
           pre_runner_script: |
             set -euo pipefail
             mkdir -p /tmp
@@ -87,58 +83,71 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Install build dependencies + Docker (Ubuntu 24.04, Docker official repo)
+      # Install Go first (host dependency for some build.assets/tooling steps)
+      - name: Set up Go (host)
+        uses: actions/setup-go@v5
+        with:
+          # Uses the repo's go.mod version automatically
+          go-version-file: go.mod
+          cache: false
+
+      - name: Install ALL required dependencies (Ubuntu only)
         shell: bash
         run: |
           set -euo pipefail
-
-          echo "Runner OS:"
+          echo "OS:"
           cat /etc/os-release || true
 
-          # Base tools needed to add Docker repo + build
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             ca-certificates curl gnupg lsb-release \
-            git jq build-essential
+            git jq \
+            build-essential \
+            pkg-config \
+            rsync \
+            unzip \
+            tar \
+            xz-utils
 
-          # Add Docker's official GPG key + APT repo (Ubuntu Noble supported)
+          # Docker official repo (ensures docker-buildx-plugin + docker-compose-plugin exist)
           sudo install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
           sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
           UBUNTU_CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
           ARCH="$(dpkg --print-architecture)"
-
-          echo \
-            "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
+          echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
             | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
           sudo apt-get update -y
-
-          # Install Docker Engine + Buildx + Compose plugin from Docker repo
           sudo apt-get install -y --no-install-recommends \
             docker-ce docker-ce-cli containerd.io \
             docker-buildx-plugin docker-compose-plugin
 
           sudo systemctl enable --now docker
-
-          # Allow runner user to use Docker immediately for this job
           sudo chmod 666 /var/run/docker.sock
 
-          echo "Verify tools:"
+          echo "Verify:"
+          go version
           make --version
-          git --version
+          gcc --version
           docker version
           docker buildx version
           docker compose version
           df -h
+
+      - name: Prepare writable cache dirs for buildbox containers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
 
       - name: Compute image tag
         id: vars
         shell: bash
         run: |
           set -euo pipefail
-
           if [[ -n "${{ inputs.version_tag }}" ]]; then
             TAG="${{ inputs.version_tag }}"
           else
@@ -149,18 +158,12 @@ jobs:
               TAG="$(echo "${GITHUB_SHA}" | cut -c1-12)"
             fi
           fi
-
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using image tag: ${TAG}"
 
-      - name: Prepare writable cache dirs for buildbox containers
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
-          chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
-          df -h
-
+      # IMPORTANT:
+      # Use the upstream build.assets flow, but avoid building buildbox images locally.
+      # On amd64 Ubuntu runner, Teleport expects to *use* existing buildbox images, not cross-build them.
       - name: Build Teleport binaries (dockerized build)
         shell: bash
         env:
@@ -171,6 +174,13 @@ jobs:
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
+
+          # Ensure buildbox images exist (they are published by upstream)
+          # If your fork references different tags, adjust TELEPORT_VERSION as needed.
+          # This step prevents Make from trying to build buildbox images.
+          docker pull ghcr.io/gravitational/teleport-buildbox-centos7:teleport18-amd64
+          docker pull ghcr.io/gravitational/teleport-buildbox-node:teleport18-amd64
+
           make -C build.assets build-binaries
 
       - name: Build Teleport Docker images
@@ -190,7 +200,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           echo "Local images:"
           docker images --format '  - {{.Repository}}:{{.Tag}}'
 
@@ -230,18 +239,15 @@ jobs:
           T2="ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS_DEBUG}:${TAG}"
           T3="ghcr.io/${GHCR_OWNER}/${REPO_TBOT_DISTROLESS}:${TAG}"
 
-          echo "Tagging ${T1}"
           docker tag "${{ steps.images.outputs.teleport_distroless_local }}" "${T1}"
 
           if [[ -n "${{ steps.images.outputs.teleport_distroless_debug_local }}" ]]; then
-            echo "Tagging ${T2}"
             docker tag "${{ steps.images.outputs.teleport_distroless_debug_local }}" "${T2}"
           else
             echo "WARN: teleport-distroless-debug local image not found; skipping."
           fi
 
           if [[ -n "${{ steps.images.outputs.tbot_distroless_local }}" ]]; then
-            echo "Tagging ${T3}"
             docker tag "${{ steps.images.outputs.tbot_distroless_local }}" "${T3}"
           else
             echo "WARN: tbot-distroless local image not found; skipping."
@@ -253,7 +259,6 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.vars.outputs.tag }}"
-
           docker push "ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS}:${TAG}"
           docker push "ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS_DEBUG}:${TAG}" || true
           docker push "ghcr.io/${GHCR_OWNER}/${REPO_TBOT_DISTROLESS}:${TAG}" || true
