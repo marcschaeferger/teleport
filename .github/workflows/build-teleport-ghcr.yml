@@ -42,7 +42,7 @@ env:
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
 
-  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp.
+  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp to avoid HOME/GOMODCACHE issues.
   HOME: /tmp
   GOPATH: /tmp/go
   GOMODCACHE: /tmp/gomodcache
@@ -64,9 +64,13 @@ jobs:
           mode: create
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+
+          # Sizing/location/OS
           server_type: ${{ inputs.server_type }}
           location: ${{ inputs.location }}
           image: ${{ inputs.image }}
+
+          # Pre-runner bootstrap: keep minimal (install is done in the job)
           pre_runner_script: |
             set -euo pipefail
             mkdir -p /tmp
@@ -83,7 +87,7 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Install dependencies (Ubuntu only, no cloud-init)
+      - name: Install build dependencies + Docker (Ubuntu 24.04, Docker official repo)
         shell: bash
         run: |
           set -euo pipefail
@@ -91,45 +95,42 @@ jobs:
           echo "Runner OS:"
           cat /etc/os-release || true
 
-          # Wait for apt/dpkg locks without relying on cloud-init.
-          wait_for_lock () {
-            local lock="$1"
-            local max_seconds="${2:-300}"  # 5 min
-            local waited=0
-            while sudo fuser "$lock" >/dev/null 2>&1; do
-              if (( waited >= max_seconds )); then
-                echo "ERROR: Timeout waiting for lock: $lock"
-                sudo fuser -v "$lock" || true
-                return 1
-              fi
-              echo "Waiting for lock $lock..."
-              sleep 5
-              waited=$((waited+5))
-            done
-          }
-
-          # These are the common lock files on Ubuntu/Debian.
-          wait_for_lock /var/lib/dpkg/lock-frontend 300 || true
-          wait_for_lock /var/lib/apt/lists/lock 300 || true
-          wait_for_lock /var/cache/apt/archives/lock 300 || true
-
-          echo "Installing required packages..."
+          # Base tools needed to add Docker repo + build
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
-            ca-certificates curl git jq \
-            build-essential \
-            docker.io docker-buildx-plugin docker-compose-plugin
+            ca-certificates curl gnupg lsb-release \
+            git jq build-essential
 
-          echo "Enable/start Docker..."
+          # Add Docker's official GPG key + APT repo (Ubuntu Noble supported)
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+          UBUNTU_CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+          ARCH="$(dpkg --print-architecture)"
+
+          echo \
+            "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          sudo apt-get update -y
+
+          # Install Docker Engine + Buildx + Compose plugin from Docker repo
+          sudo apt-get install -y --no-install-recommends \
+            docker-ce docker-ce-cli containerd.io \
+            docker-buildx-plugin docker-compose-plugin
+
           sudo systemctl enable --now docker
 
-          # Allow runner user to use Docker immediately (ephemeral runner => acceptable)
+          # Allow runner user to use Docker immediately for this job
           sudo chmod 666 /var/run/docker.sock
 
-          echo "Verify tools..."
+          echo "Verify tools:"
           make --version
           git --version
           docker version
+          docker buildx version
+          docker compose version
           df -h
 
       - name: Compute image tag
