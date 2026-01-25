@@ -25,13 +25,20 @@ permissions:
 
 env:
   # Target namespace on GHCR. By default, publish under the repo owner.
-  # If your fork is under an org, this will be that org.
   GHCR_OWNER: ${{ github.repository_owner }}
 
   # Repo names to publish (match upstream naming conventions)
   REPO_TELEPORT_DISTROLESS: teleport-distroless
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
+
+  # IMPORTANT: Buildbox containers mount /tmp:/tmp. Therefore, all caches must live under /tmp
+  # to avoid permissions issues (e.g., /home/runner not writable inside container).
+  HOME: /tmp
+  GOPATH: /tmp/go
+  GOMODCACHE: /tmp/gomodcache
+  GOCACHE: /tmp/go-build-cache
+  XDG_CACHE_HOME: /tmp/.cache
 
 jobs:
   build:
@@ -66,30 +73,38 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Docker build cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      - name: Prepare Go build caches for build.assets containers
+      - name: Prepare writable cache dirs for buildbox containers
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/go-build-cache" "${RUNNER_TEMP}/gomodcache"
-          echo "GOCACHE=${RUNNER_TEMP}/go-build-cache" >> "${GITHUB_ENV}"
-          echo "GOMODCACHE=${RUNNER_TEMP}/gomodcache" >> "${GITHUB_ENV}"
+          # These paths must exist on the *host* and be writable. They are shared with the buildbox
+          # container because the Makefile uses: -v /tmp:/tmp
+          mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+
+          echo "Cache paths (host):"
+          ls -ld /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
 
       - name: Build Teleport binaries (dockerized build)
         shell: bash
+        env:
+          HOME: /tmp
+          GOPATH: /tmp/go
+          GOMODCACHE: /tmp/gomodcache
+          GOCACHE: /tmp/go-build-cache
+          XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
           make -C build.assets build-binaries
 
       - name: Build Teleport Docker images
         shell: bash
+        env:
+          HOME: /tmp
+          GOPATH: /tmp/go
+          GOMODCACHE: /tmp/gomodcache
+          GOCACHE: /tmp/go-build-cache
+          XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
           make docker
