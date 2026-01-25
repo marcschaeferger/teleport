@@ -1,4 +1,4 @@
-name: Build Teleport images and push to GHCR
+name: Build Teleport images on Hetzner runner and push to GHCR
 
 on:
   workflow_dispatch:
@@ -15,6 +15,18 @@ on:
         description: "Push images to GHCR (true/false)"
         required: true
         default: "false"
+      server_type:
+        description: "Hetzner server type (e.g., cpx41, ccx33)."
+        required: true
+        default: "cpx41"
+      location:
+        description: "Hetzner location (e.g., fsn1, nbg1)."
+        required: true
+        default: "fsn1"
+      image:
+        description: "Hetzner OS image (e.g., ubuntu-24.04, rocky-9)."
+        required: true
+        default: "ubuntu-24.04"
   push:
     tags:
       - "v*"
@@ -24,16 +36,13 @@ permissions:
   packages: write
 
 env:
-  # Target namespace on GHCR. By default, publish under the repo owner.
   GHCR_OWNER: ${{ github.repository_owner }}
 
-  # Repo names to publish (match upstream naming conventions)
   REPO_TELEPORT_DISTROLESS: teleport-distroless
   REPO_TELEPORT_DISTROLESS_DEBUG: teleport-distroless-debug
   REPO_TBOT_DISTROLESS: tbot-distroless
 
-  # IMPORTANT: Buildbox containers mount /tmp:/tmp. Therefore, all caches must live under /tmp
-  # to avoid permissions issues (e.g., /home/runner not writable inside container).
+  # Buildbox containers mount /tmp:/tmp. Keep all caches under /tmp to avoid HOME/GOMODCACHE issues.
   HOME: /tmp
   GOPATH: /tmp/go
   GOMODCACHE: /tmp/gomodcache
@@ -41,8 +50,64 @@ env:
   XDG_CACHE_HOME: /tmp/.cache
 
 jobs:
-  build:
+  create-runner:
+    name: Create Hetzner Cloud runner
     runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.create.outputs.label }}
+      server_id: ${{ steps.create.outputs.server_id }}
+    steps:
+      - name: Create runner
+        id: create
+        uses: Cyclenerd/hcloud-github-runner@v1.3.0
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+
+          # Sizing/location/OS
+          server_type: ${{ inputs.server_type }}
+          location: ${{ inputs.location }}
+          image: ${{ inputs.image }}
+
+          # Optional (recommended): provide SSH key ID to avoid root password mail.
+          # ssh_key: ${{ secrets.HCLOUD_SSH_KEY_ID }}
+
+          # Pre-runner bootstrap: install Docker + basic toolchain needed by Teleport build targets
+          pre_runner_script: |
+            set -euo pipefail
+
+            # Ensure packages index is fresh
+            if command -v apt-get >/dev/null 2>&1; then
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -y
+              apt-get install -y --no-install-recommends \
+                ca-certificates curl git make jq \
+                docker.io docker-buildx-plugin docker-compose-plugin \
+                coreutils util-linux
+
+              systemctl enable --now docker
+              docker version
+              docker buildx version || true
+            elif command -v dnf >/dev/null 2>&1; then
+              dnf install -y git make jq ca-certificates curl docker
+              systemctl enable --now docker
+              docker version
+            elif command -v zypper >/dev/null 2>&1; then
+              zypper --non-interactive refresh
+              zypper --non-interactive install git make jq ca-certificates curl docker
+              systemctl enable --now docker
+              docker version
+            fi
+
+            # Make sure /tmp exists and is writable (runner will use it for caches)
+            mkdir -p /tmp
+            chmod 1777 /tmp
+
+  build-and-push:
+    name: Build Teleport images on Hetzner runner
+    needs: create-runner
+    runs-on: ${{ needs.create-runner.outputs.label }}
 
     steps:
       - name: Checkout
@@ -70,20 +135,13 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using image tag: ${TAG}"
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Prepare writable cache dirs for buildbox containers
         shell: bash
         run: |
           set -euo pipefail
-          # These paths must exist on the *host* and be writable. They are shared with the buildbox
-          # container because the Makefile uses: -v /tmp:/tmp
           mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
           chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
-
-          echo "Cache paths (host):"
-          ls -ld /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          df -h
 
       - name: Build Teleport binaries (dockerized build)
         shell: bash
@@ -133,7 +191,6 @@ jobs:
 
           if [[ -z "${TELEPORT_DISTROLESS_LOCAL}" ]]; then
             echo "ERROR: Could not locate a locally built teleport-distroless image."
-            echo "Adjust the grep filters in find_image() to match the actual local image names produced by your fork."
             exit 1
           fi
 
@@ -155,19 +212,18 @@ jobs:
           T2="ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS_DEBUG}:${TAG}"
           T3="ghcr.io/${GHCR_OWNER}/${REPO_TBOT_DISTROLESS}:${TAG}"
 
-          echo "Tagging:"
-          echo "  ${T1}"
+          echo "Tagging ${T1}"
           docker tag "${{ steps.images.outputs.teleport_distroless_local }}" "${T1}"
 
           if [[ -n "${{ steps.images.outputs.teleport_distroless_debug_local }}" ]]; then
-            echo "  ${T2}"
+            echo "Tagging ${T2}"
             docker tag "${{ steps.images.outputs.teleport_distroless_debug_local }}" "${T2}"
           else
             echo "WARN: teleport-distroless-debug local image not found; skipping."
           fi
 
           if [[ -n "${{ steps.images.outputs.tbot_distroless_local }}" ]]; then
-            echo "  ${T3}"
+            echo "Tagging ${T3}"
             docker tag "${{ steps.images.outputs.tbot_distroless_local }}" "${T3}"
           else
             echo "WARN: tbot-distroless local image not found; skipping."
@@ -181,8 +237,6 @@ jobs:
           TAG="${{ steps.vars.outputs.tag }}"
 
           docker push "ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS}:${TAG}"
-
-          # Optional images:
           docker push "ghcr.io/${GHCR_OWNER}/${REPO_TELEPORT_DISTROLESS_DEBUG}:${TAG}" || true
           docker push "ghcr.io/${GHCR_OWNER}/${REPO_TBOT_DISTROLESS}:${TAG}" || true
 
@@ -191,3 +245,20 @@ jobs:
         run: |
           echo "Built tag: ${{ steps.vars.outputs.tag }}"
           echo "Pushed: ${{ inputs.push }} (or tag build push on v*)"
+
+  delete-runner:
+    name: Delete Hetzner Cloud runner
+    needs:
+      - create-runner
+      - build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Delete runner
+        uses: Cyclenerd/hcloud-github-runner@v1.3.0
+        with:
+          mode: delete
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          name: ${{ needs.create-runner.outputs.label }}
+          server_id: ${{ needs.create-runner.outputs.server_id }}
