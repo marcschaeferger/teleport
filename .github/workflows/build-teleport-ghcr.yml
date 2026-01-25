@@ -77,32 +77,46 @@ jobs:
           pre_runner_script: |
             set -euo pipefail
 
-            # Ensure packages index is fresh
+            echo "=== OS info ==="
+            cat /etc/os-release || true
+            uname -a || true
+
+            echo "=== Installing base dependencies (git, make, docker) ==="
             if command -v apt-get >/dev/null 2>&1; then
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -y
+              # build-essential ensures make + toolchain basics
               apt-get install -y --no-install-recommends \
-                ca-certificates curl git make jq \
+                ca-certificates curl git jq \
+                build-essential \
                 docker.io docker-buildx-plugin docker-compose-plugin \
                 coreutils util-linux
-
               systemctl enable --now docker
-              docker version
-              docker buildx version || true
             elif command -v dnf >/dev/null 2>&1; then
               dnf install -y git make jq ca-certificates curl docker
               systemctl enable --now docker
-              docker version
+              systemctl start docker
             elif command -v zypper >/dev/null 2>&1; then
               zypper --non-interactive refresh
               zypper --non-interactive install git make jq ca-certificates curl docker
               systemctl enable --now docker
-              docker version
+              systemctl start docker
+            else
+              echo "ERROR: No supported package manager found (apt-get/dnf/zypper)."
+              exit 1
             fi
 
-            # Make sure /tmp exists and is writable (runner will use it for caches)
+            echo "=== Verifying tools ==="
+            command -v make
+            command -v git
+            command -v docker
+
+            docker version
+
+            echo "=== /tmp setup ==="
             mkdir -p /tmp
             chmod 1777 /tmp
+
 
   build-and-push:
     name: Build Teleport images on Hetzner runner
@@ -110,6 +124,19 @@ jobs:
     runs-on: ${{ needs.create-runner.outputs.label }}
 
     steps:
+      - name: Verify runner toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Runner OS:"
+          cat /etc/os-release || true
+          echo "Tools:"
+          command -v make
+          command -v git
+          command -v docker
+          docker version
+          df -h
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
