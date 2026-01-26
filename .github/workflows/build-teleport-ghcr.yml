@@ -213,12 +213,15 @@ jobs:
         env:
           HOME: /tmp
           GOPATH: /tmp/go
-          # Change only what is needed: use the mounted /go/cache volume for module downloads
           GOMODCACHE: /go/cache/gomodcache
           GOCACHE: /tmp/go-build-cache
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
+
+          # FIX: ensure buildbox user is NOT created as UID 0 / GID 0
+          export UID=1000
+          export GID=1000
 
           BUILD_UID="${{ steps.ug.outputs.build_uid }}"
           BUILD_GID="${{ steps.ug.outputs.build_gid }}"
@@ -255,7 +258,7 @@ jobs:
             elif [[ -f build.assets/Dockerfile-centos7-assets-image ]]; then
               DF="Dockerfile-centos7-assets-image"
             elif [[ -f build.assets/Dockerfile-centos7-assets.dockerfile ]]; then
-              DF="build.assets/Dockerfile-centos7-assets.dockerfile"
+              DF="Dockerfile-centos7-assets.dockerfile"
             else
               echo "ERROR: Could not find a Dockerfile for centos7 assets in build.assets/"
               echo "Files:"
@@ -293,9 +296,15 @@ jobs:
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
+
+          # FIX: ensure buildbox user is NOT created as UID 0 / GID 0
+          export UID=1000
+          export GID=1000
+
           BUILD_UID="${{ steps.ug.outputs.build_uid }}"
           BUILD_GID="${{ steps.ug.outputs.build_gid }}"
           make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" build-binaries
+
 
       - name: Build Teleport Docker images
         shell: bash
