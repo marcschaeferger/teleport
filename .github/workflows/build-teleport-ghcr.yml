@@ -223,12 +223,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # FIX: ensure buildbox user is NOT created as UID 0 / GID 0
-          export UID=1000
-          export GID=1000
-
-          BUILD_UID="${{ steps.ug.outputs.build_uid }}"
-          BUILD_GID="${{ steps.ug.outputs.build_gid }}"
           NODE_VERSION_DEFAULT="20"
 
           echo "=== build.assets dir ==="
@@ -265,7 +259,6 @@ jobs:
               DF="Dockerfile-centos7-assets.dockerfile"
             else
               echo "ERROR: Could not find a Dockerfile for centos7 assets in build.assets/"
-              echo "Files:"
               ls -la build.assets
               exit 1
             fi
@@ -300,13 +293,6 @@ jobs:
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
-
-          # FIX: ensure buildbox user is NOT created as UID 0 / GID 0
-          export UID=1000
-          export GID=1000
-
-          BUILD_UID="${{ steps.ug.outputs.build_uid }}"
-          BUILD_GID="${{ steps.ug.outputs.build_gid }}"
           make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" build-binaries
 
       - name: Build Teleport Docker images
