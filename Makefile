@@ -16,6 +16,12 @@
 VERSION=19.0.0-dev
 
 DOCKER_IMAGE ?= teleport
+DISTROLESS_IMAGE ?= teleport-distroless
+DISTROLESS_DEBUG_IMAGE ?= teleport-distroless-debug
+TBOT_DISTROLESS_IMAGE ?= tbot-distroless
+DISTROLESS_BASE_IMAGE ?= gcr.io/distroless/cc-debian12
+DISTROLESS_DEBUG_BASE_IMAGE ?= gcr.io/distroless/cc-debian12:debug
+TELEPORT_RELEASE_INFIX ?=
 
 # This directory will be the real path of the directory of the first Makefile in the list.
 MAKE_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
@@ -1535,6 +1541,39 @@ docker:
 .PHONY:docker-binaries
 docker-binaries: clean
 	make -C build.assets build-binaries PIV=$(PIV)
+
+# Build distroless Docker images for Teleport and tbot.
+.PHONY:docker-distroless
+docker-distroless: clean docker-binaries build-archive oss-deb
+	@mkdir -p $(BUILDDIR)/distroless
+	@cp build.assets/charts/fetch-debs $(BUILDDIR)/distroless/
+	@cp build.assets/charts/Dockerfile-distroless $(BUILDDIR)/distroless/Dockerfile-distroless
+	@cp build.assets/charts/Dockerfile-tbot-distroless $(BUILDDIR)/distroless/Dockerfile-tbot-distroless
+	@cp $(BUILDDIR)/teleport_$(VERSION)_$(ARCH).deb $(BUILDDIR)/distroless/
+	docker buildx build --load \
+		-f $(BUILDDIR)/distroless/Dockerfile-distroless \
+		--build-arg BASE_IMAGE=$(DISTROLESS_BASE_IMAGE) \
+		--build-arg TELEPORT_VERSION=$(VERSION) \
+		--build-arg TELEPORT_RELEASE_INFIX=$(TELEPORT_RELEASE_INFIX) \
+		--build-arg TARGETARCH=$(ARCH) \
+		-t $(DISTROLESS_IMAGE):$(VERSION) \
+		$(BUILDDIR)/distroless
+	docker buildx build --load \
+		-f $(BUILDDIR)/distroless/Dockerfile-distroless \
+		--build-arg BASE_IMAGE=$(DISTROLESS_DEBUG_BASE_IMAGE) \
+		--build-arg TELEPORT_VERSION=$(VERSION) \
+		--build-arg TELEPORT_RELEASE_INFIX=$(TELEPORT_RELEASE_INFIX) \
+		--build-arg TARGETARCH=$(ARCH) \
+		-t $(DISTROLESS_DEBUG_IMAGE):$(VERSION) \
+		$(BUILDDIR)/distroless
+	docker buildx build --load \
+		-f $(BUILDDIR)/distroless/Dockerfile-tbot-distroless \
+		--build-arg BASE_IMAGE=$(DISTROLESS_BASE_IMAGE) \
+		--build-arg TELEPORT_VERSION=$(VERSION) \
+		--build-arg TELEPORT_RELEASE_INFIX=$(TELEPORT_RELEASE_INFIX) \
+		--build-arg TARGETARCH=$(ARCH) \
+		-t $(TBOT_DISTROLESS_IMAGE):$(VERSION) \
+		$(BUILDDIR)/distroless
 
 # Interactively enters a Docker container (which you can build and run Teleport inside of)
 .PHONY:enter

@@ -63,9 +63,9 @@ jobs:
           mode: create
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
-          server_type: ${{ inputs.server_type }}
-          location: ${{ inputs.location }}
-          image: ${{ inputs.image }}
+          server_type: ${{ inputs.server_type || 'cpx42' }}
+          location: ${{ inputs.location || 'fsn1' }}
+          image: ${{ inputs.image || 'ubuntu-24.04' }}
           pre_runner_script: |
             set -euo pipefail
             mkdir -p /tmp
@@ -80,7 +80,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Normalize go directive in all go.mod files (X.Y.Z -> X.Y)
         shell: bash
@@ -286,7 +286,7 @@ jobs:
               buildbox-centos7
           fi
 
-      - name: Build Teleport binaries (dockerized build)
+      - name: Build Teleport binaries and distroless Docker images
         shell: bash
         env:
           HOME: /tmp
@@ -296,27 +296,9 @@ jobs:
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
-
-          # FIX: ensure buildbox user is NOT created as UID 0 / GID 0
           export UID=1000
           export GID=1000
-
-          BUILD_UID="${{ steps.ug.outputs.build_uid }}"
-          BUILD_GID="${{ steps.ug.outputs.build_gid }}"
-          make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" build-binaries
-
-
-      - name: Build Teleport Docker images
-        shell: bash
-        env:
-          HOME: /tmp
-          GOPATH: /tmp/go
-          GOMODCACHE: /go/cache/gomodcache
-          GOCACHE: /tmp/go-build-cache
-          XDG_CACHE_HOME: /tmp/.cache
-        run: |
-          set -euo pipefail
-          make docker
+          make docker-distroless
 
       - name: Identify locally built images
         id: images
