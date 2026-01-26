@@ -16,6 +16,13 @@
 VERSION=19.0.0-dev
 
 DOCKER_IMAGE ?= teleport
+DOCKER_DISTROLESS_IMAGE ?= teleport-distroless
+DOCKER_DISTROLESS_DEBUG_IMAGE ?= teleport-distroless-debug
+DOCKER_TBOT_DISTROLESS_IMAGE ?= tbot-distroless
+
+DISTROLESS_BASE_IMAGE ?= gcr.io/distroless/cc-debian12
+DISTROLESS_DEBUG_BASE_IMAGE ?= gcr.io/distroless/cc-debian12:debug
+TELEPORT_RELEASE_INFIX ?=
 
 # This directory will be the real path of the directory of the first Makefile in the list.
 MAKE_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
@@ -1535,6 +1542,41 @@ docker:
 .PHONY:docker-binaries
 docker-binaries: clean
 	make -C build.assets build-binaries PIV=$(PIV)
+
+# Build distroless Docker images (teleport + tbot) from locally built .deb packages.
+.PHONY:docker-distroless
+docker-distroless: OS=linux
+docker-distroless: TARBALL_PATH_SECTION:=-s "$(shell pwd)"
+docker-distroless: clean docker-binaries build-archive oss-deb
+	@echo "---> Building distroless Docker images."
+	@DISTROLESS_CONTEXT="$(BUILDDIR)/distroless-context"; \
+	rm -rf "$${DISTROLESS_CONTEXT}"; \
+	mkdir -p "$${DISTROLESS_CONTEXT}"; \
+	cp build.assets/charts/fetch-debs "$${DISTROLESS_CONTEXT}/"; \
+	cp build.assets/charts/Dockerfile-distroless "$${DISTROLESS_CONTEXT}/"; \
+	cp build.assets/charts/Dockerfile-tbot-distroless "$${DISTROLESS_CONTEXT}/"; \
+	cp "$(BUILDDIR)/teleport_$(VERSION)_$(ARCH).deb" "$${DISTROLESS_CONTEXT}/"; \
+	docker buildx build --load \
+		--build-arg BASE_IMAGE="$(DISTROLESS_BASE_IMAGE)" \
+		--build-arg TELEPORT_VERSION="$(VERSION)" \
+		--build-arg TELEPORT_RELEASE_INFIX="$(TELEPORT_RELEASE_INFIX)" \
+		-f "$${DISTROLESS_CONTEXT}/Dockerfile-distroless" \
+		-t "$(DOCKER_DISTROLESS_IMAGE):$(VERSION)" \
+		"$${DISTROLESS_CONTEXT}"; \
+	docker buildx build --load \
+		--build-arg BASE_IMAGE="$(DISTROLESS_DEBUG_BASE_IMAGE)" \
+		--build-arg TELEPORT_VERSION="$(VERSION)" \
+		--build-arg TELEPORT_RELEASE_INFIX="$(TELEPORT_RELEASE_INFIX)" \
+		-f "$${DISTROLESS_CONTEXT}/Dockerfile-distroless" \
+		-t "$(DOCKER_DISTROLESS_DEBUG_IMAGE):$(VERSION)" \
+		"$${DISTROLESS_CONTEXT}"; \
+	docker buildx build --load \
+		--build-arg BASE_IMAGE="$(DISTROLESS_BASE_IMAGE)" \
+		--build-arg TELEPORT_VERSION="$(VERSION)" \
+		--build-arg TELEPORT_RELEASE_INFIX="$(TELEPORT_RELEASE_INFIX)" \
+		-f "$${DISTROLESS_CONTEXT}/Dockerfile-tbot-distroless" \
+		-t "$(DOCKER_TBOT_DISTROLESS_IMAGE):$(VERSION)" \
+		"$${DISTROLESS_CONTEXT}"
 
 # Interactively enters a Docker container (which you can build and run Teleport inside of)
 .PHONY:enter

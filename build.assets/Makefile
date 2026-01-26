@@ -792,6 +792,9 @@ print-buildbox-version:
 #
 # Build CentOS 7 assets - clang.
 #
+.PHONY:buildbox-centos7-assets
+buildbox-centos7-assets: build-centos7-assets
+
 .PHONY:build-centos7-assets
 build-centos7-assets:
 	docker buildx build \
