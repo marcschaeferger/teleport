@@ -48,6 +48,10 @@ env:
   GOCACHE: /tmp/go-build-cache
   XDG_CACHE_HOME: /tmp/.cache
 
+  # FIX: do NOT use UID (readonly in bash); use our own variables
+  BUILD_UID: "1000"
+  BUILD_GID: "1000"
+
 jobs:
   create-runner:
     name: Create Hetzner Cloud runner
@@ -305,7 +309,6 @@ jobs:
           BUILD_GID="${{ steps.ug.outputs.build_gid }}"
           make -C build.assets UID="${BUILD_UID}" GID="${BUILD_GID}" build-binaries
 
-
       - name: Build Teleport Docker images
         shell: bash
         env:
@@ -316,7 +319,7 @@ jobs:
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
-          make docker
+          make UID="${BUILD_UID}" GID="${BUILD_GID}" docker
 
       - name: Identify locally built images
         id: images
