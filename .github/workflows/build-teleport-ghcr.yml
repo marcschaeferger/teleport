@@ -151,8 +151,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
-          chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          # Must be writable for the buildbox containers running as -u 1000:1000
+          sudo mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          sudo chown -R 1000:1000 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          sudo chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          ls -ld /tmp /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
 
       - name: Compute build UID/GID (force non-root)
         id: ug
