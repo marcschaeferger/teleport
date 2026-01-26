@@ -109,17 +109,26 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      # FIX: ensure build.assets/tooling/go.mod is tidy for cmd/check
-      # This prevents: "go: updates to go.mod needed; to update it: go mod tidy"
-      - name: go mod tidy for build.assets/tooling (fix validate-semver)
+      # ============================================================
+      # FULL FIX: Ensure every module is "tidy" after your go.mod edits
+      # This prevents the buildbox Go invocations from failing with:
+      #   "go: updates to go.mod needed; to update it: go mod tidy"
+      # ============================================================
+      - name: Go module tidy for all modules (root + nested)
         shell: bash
         run: |
           set -euo pipefail
-          pushd build.assets/tooling
-          GOWORK=off go mod tidy
-          popd
-      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+          # Find all unique directories containing a go.mod
+          mapfile -t MOD_DIRS < <(find . -name go.mod -print0 | xargs -0 -n1 dirname | sort -u)
+
+          echo "Found ${#MOD_DIRS[@]} Go modules:"
+          printf '  - %s\n' "${MOD_DIRS[@]}"
+
+          for d in "${MOD_DIRS[@]}"; do
+            echo "Tidying module: ${d}"
+            (cd "${d}" && GOWORK=off go mod tidy)
+          done
 
       - name: Install ALL host dependencies (Ubuntu only)
         shell: bash
@@ -246,7 +255,7 @@ jobs:
             elif [[ -f build.assets/Dockerfile-centos7-assets-image ]]; then
               DF="Dockerfile-centos7-assets-image"
             elif [[ -f build.assets/Dockerfile-centos7-assets.dockerfile ]]; then
-              DF="Dockerfile-centos7-assets.dockerfile"
+              DF="build.assets/Dockerfile-centos7-assets.dockerfile"
             else
               echo "ERROR: Could not find a Dockerfile for centos7 assets in build.assets/"
               echo "Files:"
@@ -279,7 +288,6 @@ jobs:
         env:
           HOME: /tmp
           GOPATH: /tmp/go
-          # Same fix here as well (buildbox uses docker run internally)
           GOMODCACHE: /go/cache/gomodcache
           GOCACHE: /tmp/go-build-cache
           XDG_CACHE_HOME: /tmp/.cache
