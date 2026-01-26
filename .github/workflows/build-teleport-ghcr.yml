@@ -316,7 +316,7 @@ jobs:
           XDG_CACHE_HOME: /tmp/.cache
         run: |
           set -euo pipefail
-          make docker
+          make docker-distroless
 
       - name: Identify locally built images
         id: images
