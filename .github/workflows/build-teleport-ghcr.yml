@@ -307,6 +307,67 @@ jobs:
           set -euo pipefail
           make UID="${BUILD_UID}" GID="${BUILD_GID}" docker
 
+      - name: Build OSS deb package (for distroless images)
+        shell: bash
+        env:
+          HOME: /tmp
+          GOPATH: /tmp/go
+          GOMODCACHE: /go/cache/gomodcache
+          GOCACHE: /tmp/go-build-cache
+          XDG_CACHE_HOME: /tmp/.cache
+        run: |
+          set -euo pipefail
+          make UID="${BUILD_UID}" GID="${BUILD_GID}" oss-deb
+
+      - name: Build distroless images locally
+        shell: bash
+        env:
+          HOME: /tmp
+          GOPATH: /tmp/go
+          GOMODCACHE: /go/cache/gomodcache
+          GOCACHE: /tmp/go-build-cache
+          XDG_CACHE_HOME: /tmp/.cache
+        run: |
+          set -euo pipefail
+          VERSION="$(make print-version)"
+          DEB_PATH="build/teleport_${VERSION}_amd64.deb"
+
+          if [[ ! -f "${DEB_PATH}" ]]; then
+            echo "ERROR: Expected deb package not found at ${DEB_PATH}"
+            ls -la build || true
+            exit 1
+          fi
+
+          cp build.assets/charts/fetch-debs build/
+
+          docker buildx build \
+            --load \
+            --platform=linux/amd64 \
+            -f build.assets/charts/Dockerfile-distroless \
+            -t teleport-distroless:local \
+            --build-arg TELEPORT_VERSION="${VERSION}" \
+            --build-arg TELEPORT_RELEASE_INFIX="" \
+            build
+
+          docker buildx build \
+            --load \
+            --platform=linux/amd64 \
+            -f build.assets/charts/Dockerfile-distroless \
+            -t teleport-distroless-debug:local \
+            --build-arg BASE_IMAGE="gcr.io/distroless/cc-debian12:debug" \
+            --build-arg TELEPORT_VERSION="${VERSION}" \
+            --build-arg TELEPORT_RELEASE_INFIX="" \
+            build
+
+          docker buildx build \
+            --load \
+            --platform=linux/amd64 \
+            -f build.assets/charts/Dockerfile-tbot-distroless \
+            -t tbot-distroless:local \
+            --build-arg TELEPORT_VERSION="${VERSION}" \
+            --build-arg TELEPORT_RELEASE_INFIX="" \
+            build
+
       - name: Identify locally built images
         id: images
         shell: bash
