@@ -109,6 +109,18 @@ jobs:
           go-version-file: go.mod
           cache: false
 
+      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      # FIX: ensure build.assets/tooling/go.mod is tidy for cmd/check
+      # This prevents: "go: updates to go.mod needed; to update it: go mod tidy"
+      - name: go mod tidy for build.assets/tooling (fix validate-semver)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd build.assets/tooling
+          GOWORK=off go mod tidy
+          popd
+      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
       - name: Install ALL host dependencies (Ubuntu only)
         shell: bash
         run: |
