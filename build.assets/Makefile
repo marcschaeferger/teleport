@@ -19,8 +19,8 @@ TEST_KUBE ?=
 
 OS ?= linux
 
-UID := $$(id -u)
-GID := $$(id -g)
+UID ?= $$(id -u)
+GID ?= $$(id -g)
 NOROOT := -u $(UID):$(GID)
 
 include util.mk
