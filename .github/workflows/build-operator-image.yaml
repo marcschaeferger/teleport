@@ -1,52 +1,68 @@
-name: Build and Push Operator Image
+name: Build and Push Operator Image on Hetzner
 run-name: Build Operator Image - ${{ github.run_id }} - @${{ github.actor }}
 
 on:
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Git ref to build (tag/branch/SHA). Empty = current ref.'
+        required: false
+        default: ''
       registry:
-        description: 'Container registry (e.g., ghcr.io, docker.io)'
-        required: true
-        default: 'ghcr.io'
+        description: 'Container registry (e.g., ghcr.io (default), docker.io)'
+        required: false
+        default: ''
       image_name:
-        description: 'Image name without registry (e.g., yourorg/teleport-operator)'
-        required: true
-        default: 'yourorg/teleport-operator'
+        description: 'Image name without registry. Empty = auto-generate from repo.'
+        required: false
+        default: ''
       image_tag:
-        description: 'Image tag (leave empty to use branch name or PR number)'
+        description: 'Image tag. Empty = derive from git tag or SHA.'
         required: false
         default: ''
       platforms:
         description: 'Target platforms (comma-separated)'
-        required: true
+        required: false
         default: 'linux/amd64,linux/arm64'
       base_image:
         description: 'Base distroless image'
-        required: true
+        required: false
         default: 'gcr.io/distroless/cc-debian12'
       push:
         description: 'Push to registry (true/false)'
-        required: true
+        required: false
         default: 'true'
         type: choice
         options:
           - 'true'
           - 'false'
+      server_type:
+        description: 'Hetzner server type (e.g., cpx42, ccx33)'
+        required: false
+        default: 'cpx42'
+      location:
+        description: 'Hetzner location (e.g., fsn1, nbg1)'
+        required: false
+        default: 'fsn1'
+      image:
+        description: 'Hetzner OS image (Ubuntu only, e.g., ubuntu-24.04)'
+        required: false
+        default: 'ubuntu-24.04'
 
-  #push:
-  #  branches:
-  #    - main
-  #    - master
-  #    - 'branch/*'
-  #  paths:
-  #    - 'integrations/operator/**'
-  #    - 'api/**'
-  #    - 'lib/**'
-  #    - 'gen/**'
-  #    - 'entitlements/**'
-  #    - 'go.mod'
-  #    - 'go.sum'
-  #    - '.github/workflows/build-operator-image.yaml'
+#  push:
+#    branches:
+#      - main
+#      - master
+#      - 'branch/*'
+#    paths:
+#      - 'integrations/operator/**'
+#      - 'api/**'
+#      - 'lib/**'
+#      - 'gen/**'
+#      - 'entitlements/**'
+#      - 'go.mod'
+#      - 'go.sum'
+#      - '.github/workflows/build-operator-image.yaml'
 
 #  pull_request:
 #    paths:
@@ -59,109 +75,268 @@ on:
 #      - 'go.sum'
 #      - '.github/workflows/build-operator-image.yaml'
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   REGISTRY: ${{ inputs.registry || 'ghcr.io' }}
-  IMAGE_NAME: ${{ inputs.image_name || format('{0}/teleport-operator', github.repository_owner) }}
+  IMAGE_NAME: ${{ inputs.image_name || 'teleport-operator' }}
+  GHCR_OWNER: ${{ github.repository_owner }}
   BASE_IMAGE: ${{ inputs.base_image || 'gcr.io/distroless/cc-debian12' }}
   PLATFORMS: ${{ inputs.platforms || 'linux/amd64,linux/arm64' }}
+  
+  HOME: /tmp
+  GOPATH: /tmp/go
+  GOMODCACHE: /tmp/gomodcache
+  GOCACHE: /tmp/go-build-cache
+  XDG_CACHE_HOME: /tmp/.cache
+  
+  BUILD_UID: "1000"
+  BUILD_GID: "1000"
 
 jobs:
+  create-runner:
+    name: Create Hetzner Cloud runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.create.outputs.label }}
+      server_id: ${{ steps.create.outputs.server_id }}
+    steps:
+      - name: Create runner
+        id: create
+        uses: Cyclenerd/hcloud-github-runner@v1.3.0
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: ${{ inputs.server_type || 'cpx42' }}
+          location: ${{ inputs.location || 'fsn1' }}
+          image: ${{ inputs.image || 'ubuntu-24.04' }}
+          pre_runner_script: |
+            set -euo pipefail
+            mkdir -p /tmp
+            chmod 1777 /tmp
+
   build-and-push:
     name: Build and Push Operator Image
-    runs-on: ubuntu-22.04
-
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
+    needs: create-runner
+    runs-on: ${{ needs.create-runner.outputs.label }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Normalize go directive in all go.mod files (X.Y.Z -> X.Y)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "go.mod before:"
+          sed -n '1,6p' go.mod || true
+
+          while IFS= read -r -d '' f; do
+            perl -0777 -pe 's/^(go\s+\d+\.\d+)\.\d+(\s*)$/$1$2/m' -i "$f"
+          done < <(find . -name go.mod -print0)
+
+          echo "go.mod after:"
+          sed -n '1,6p' go.mod || true
+
+      - name: Fix workspace permissions for UID 1000
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
+          sudo chmod -R u+rwX,g+rwX "$GITHUB_WORKSPACE"
+
+      - name: Set up Go (host)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Go module tidy for all modules (root + nested)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t MOD_DIRS < <(find . -name go.mod -print0 | xargs -0 -n1 dirname | sort -u)
+
+          echo "Found ${#MOD_DIRS[@]} Go modules:"
+          printf '  - %s\n' "${MOD_DIRS[@]}"
+
+          for d in "${MOD_DIRS[@]}"; do
+            echo "Tidying module: ${d}"
+            (cd "${d}" && GOWORK=off go mod tidy)
+          done
+
+      - name: Install ALL host dependencies (Ubuntu only)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl gnupg lsb-release \
+            git jq \
+            build-essential pkg-config \
+            rsync unzip tar xz-utils
+
+          # Docker official repo (ensures docker-buildx-plugin + docker-compose-plugin exist)
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+          UBUNTU_CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME}")"
+          ARCH="$(dpkg --print-architecture)"
+          echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            docker-ce docker-ce-cli containerd.io \
+            docker-buildx-plugin docker-compose-plugin
+
+          sudo systemctl enable --now docker
+          sudo chmod 666 /var/run/docker.sock
+
+          echo "Verify toolchain:"
+          go version
+          make --version
+          docker version
+          docker buildx version
+          docker compose version || true
+          df -h
+
+      - name: Prepare writable cache dirs (/tmp)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+          chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
+
+          sudo chown -R 1000:1000 /tmp/go-build-cache
+          mkdir -p /tmp/go-build-cache/gomodcache
+          sudo chown -R 1000:1000 /tmp/go-build-cache/gomodcache
+          chmod -R 0777 /tmp/go-build-cache /tmp/go-build-cache/gomodcache
+
+      - name: Set up QEMU for multi-arch builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --privileged --rm tonistiigi/binfmt --install all
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: network=host
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx create --use --name operator-builder --driver docker-container || docker buildx use operator-builder
+          docker buildx inspect --bootstrap
 
       - name: Determine image tag
         id: meta
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -n "${{ inputs.image_tag }}" ]; then
             TAG="${{ inputs.image_tag }}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            TAG="pr-${{ github.event.pull_request.number }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            # Use branch name, replace / with -
-            TAG="${GITHUB_REF#refs/heads/}"
-            TAG="${TAG//\//-}"
           else
-            TAG="latest"
+            REF_NAME="${GITHUB_REF_NAME:-}"
+            if [[ "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+              TAG="${REF_NAME#v}"
+            else
+              TAG="$(echo "${GITHUB_SHA}" | cut -c1-12)"
+            fi
           fi
           
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "Full image tag: ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+          echo "Using image tag: ${TAG}"
 
       - name: Log in to Container Registry
-        if: ${{ inputs.push != 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for Docker
-        id: docker-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=${{ steps.meta.outputs.tag }}
-            type=sha,prefix=sha-,format=short
-            type=ref,event=pr,prefix=pr-
+        if: ${{ inputs.push == 'true' || github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u "${{ github.actor }}" --password-stdin
 
       - name: Build and push operator image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./integrations/operator/Dockerfile.gha
-          platforms: ${{ env.PLATFORMS }}
-          push: ${{ inputs.push != 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
-          labels: ${{ steps.docker-meta.outputs.labels }}
-          build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          TAG="${{ steps.meta.outputs.tag }}"
+          FULL_IMAGE="${{ env.REGISTRY }}/${GHCR_OWNER}/${{ env.IMAGE_NAME }}:${TAG}"
+          
+          PUSH_FLAG=""
+          if [ "${{ inputs.push }}" = "true" ] || [ "${{ github.event_name }}" = "push" ]; then
+            PUSH_FLAG="--push"
+            echo "Will push image to: ${FULL_IMAGE}"
+          else
+            PUSH_FLAG="--load"
+            echo "Will load image locally (not pushing)"
+          fi
+          
+          docker buildx build \
+            --platform ${{ env.PLATFORMS }} \
+            -f integrations/operator/Dockerfile.gha \
+            --build-arg BASE_IMAGE=${{ env.BASE_IMAGE }} \
+            -t "${FULL_IMAGE}" \
+            ${PUSH_FLAG} \
+            .
 
       - name: Image details
+        shell: bash
         run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          FULL_IMAGE="${{ env.REGISTRY }}/${GHCR_OWNER}/${{ env.IMAGE_NAME }}:${TAG}"
+          
           echo "### Operator Image Build Summary :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Git Ref:** \`${{ inputs.ref || github.ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit SHA:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Registry:** \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** \`${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Tag:** \`${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${GHCR_OWNER}/${{ env.IMAGE_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${TAG}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Platforms:** \`${{ env.PLATFORMS }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Base Image:** \`${{ env.BASE_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Hetzner Server:** \`${{ inputs.server_type || 'cpx42' }}\` in \`${{ inputs.location || 'fsn1' }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Full Image Reference:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "${FULL_IMAGE}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ inputs.push }}" = "false" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ inputs.push }}" != "true" ] && [ "${{ github.event_name }}" != "push" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Note:** Image was built but not pushed to registry." >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Test image (pull and inspect)
-        if: ${{ inputs.push != 'false' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+        if: ${{ inputs.push == 'true' || github.event_name == 'push' }}
+        shell: bash
         run: |
-          # Pull the first platform to verify push was successful
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          FULL_IMAGE="${{ env.REGISTRY }}/${GHCR_OWNER}/${{ env.IMAGE_NAME }}:${TAG}"
+          
           FIRST_PLATFORM=$(echo "${{ env.PLATFORMS }}" | cut -d',' -f1)
-          docker pull --platform="${FIRST_PLATFORM}" "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
-          docker inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
+          docker pull --platform="${FIRST_PLATFORM}" "${FULL_IMAGE}"
+          docker inspect "${FULL_IMAGE}"
+
+  delete-runner:
+    name: Delete Hetzner Cloud runner
+    needs:
+      - create-runner
+      - build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Delete runner
+        uses: Cyclenerd/hcloud-github-runner@v1.3.0
+        with:
+          mode: delete
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          name: ${{ needs.create-runner.outputs.label }}
+          server_id: ${{ needs.create-runner.outputs.server_id }}
