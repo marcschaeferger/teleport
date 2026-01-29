@@ -60,7 +60,7 @@ export function LoginComponent({
     return null;
   }
 
-  if (!licenseAcknowledged && cfg.edition === 'community') {
+  if (!licenseAcknowledged && cfg.edition === 'teleport-community') {
     return (
       <LicenseAcknowledgement setLicenseAcknowledged={setLicenseAcknowledged} />
     );
