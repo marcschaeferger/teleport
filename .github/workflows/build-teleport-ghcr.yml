@@ -3,12 +3,21 @@ name: Build Teleport images on Hetzner runner and push to GHCR
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Git ref to build (tag/branch/SHA). Empty = current ref."
-        required: false
-        default: ""
+      ref_type:
+        description: "What do you want to build?"
+        type: choice
+        required: true
+        default: branch
+        options:
+          - branch
+          - tag
+          - sha
+      ref_name:
+        description: "Branch/tag name (e.g., v18.6.4 or api/v18.6.4) or full SHA"
+        required: true
+        default: "main"
       version_tag:
-        description: "Image tag to publish (e.g., 18.6.4). Empty = derive from git tag or SHA."
+        description: "Image tag to publish (e.g., 18.6.4). Empty = derive from ref."
         required: false
         default: ""
       push:
@@ -27,6 +36,7 @@ on:
         description: "Hetzner OS image (Ubuntu only, e.g., ubuntu-24.04)."
         required: true
         default: "ubuntu-24.04"
+
   push:
     tags:
       - "v*"
@@ -81,10 +91,38 @@ jobs:
     runs-on: ${{ needs.create-runner.outputs.label }}
 
     steps:
-      - name: Checkout
+      - name: Checkout ref (branch/tag/SHA – unambiguous)
+        id: checkoutref
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          ref: ${{ (inputs.ref_type == 'branch' && format('refs/heads/{0}', inputs.ref_name)) || (inputs.ref_type == 'tag' && format('refs/tags/{0}', inputs.ref_name)) || inputs.ref_name }}
+
+      - name: Validate ref exists (heads/tags) and input is sane
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REF_TYPE="${{ inputs.ref_type }}"
+          REF_NAME="${{ inputs.ref_name }}"
+
+          if [[ "${REF_TYPE}" == "branch" ]]; then
+            git ls-remote --exit-code --heads origin "${REF_NAME}" >/dev/null
+            echo "OK: branch exists: ${REF_NAME}"
+          elif [[ "${REF_TYPE}" == "tag" ]]; then
+            git ls-remote --exit-code --tags origin "${REF_NAME}" >/dev/null
+            echo "OK: tag exists: ${REF_NAME}"
+          elif [[ "${REF_TYPE}" == "sha" ]]; then
+            if [[ ! "${REF_NAME}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+              echo "ERROR: ref_name must be a git SHA (7-40 hex chars) when ref_type=sha"
+              exit 1
+            fi
+            git cat-file -e "${REF_NAME}^{commit}"
+            echo "OK: commit exists: ${REF_NAME}"
+          else
+            echo "ERROR: invalid ref_type: ${REF_TYPE}"
+            exit 1
+          fi
 
       - name: Normalize go directive in all go.mod files (X.Y.Z -> X.Y)
         shell: bash
@@ -113,17 +151,11 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      # ============================================================
-      # FULL FIX: Ensure every module is "tidy" after your go.mod edits
-      # This prevents the buildbox Go invocations from failing with:
-      #   "go: updates to go.mod needed; to update it: go mod tidy"
-      # ============================================================
       - name: Go module tidy for all modules (root + nested)
         shell: bash
         run: |
           set -euo pipefail
 
-          # Find all unique directories containing a go.mod
           mapfile -t MOD_DIRS < <(find . -name go.mod -print0 | xargs -0 -n1 dirname | sort -u)
 
           echo "Found ${#MOD_DIRS[@]} Go modules:"
@@ -146,7 +178,6 @@ jobs:
             build-essential pkg-config \
             rsync unzip tar xz-utils
 
-          # Docker official repo (ensures docker-buildx-plugin + docker-compose-plugin exist)
           sudo install -m 0755 -d /etc/apt/keyrings
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
           sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -179,7 +210,6 @@ jobs:
           mkdir -p /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
           chmod -R 0777 /tmp/gomodcache /tmp/go-build-cache /tmp/go /tmp/.cache
 
-          # Critical: make sure the docker-mounted cache volume is writable by UID 1000
           sudo chown -R 1000:1000 /tmp/go-build-cache
           mkdir -p /tmp/go-build-cache/gomodcache
           sudo chown -R 1000:1000 /tmp/go-build-cache/gomodcache
@@ -194,21 +224,32 @@ jobs:
           echo "build_gid=1000" >> "$GITHUB_OUTPUT"
           echo "Using BUILD_UID=1000 BUILD_GID=1000"
 
-      - name: Compute image tag
+      - name: Compute image tag (from chosen ref, not from workflow ref)
         id: vars
         shell: bash
         run: |
           set -euo pipefail
+
           if [[ -n "${{ inputs.version_tag }}" ]]; then
             TAG="${{ inputs.version_tag }}"
           else
-            REF_NAME="${GITHUB_REF_NAME:-}"
-            if [[ "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-              TAG="${REF_NAME#v}"
+            REF_TYPE="${{ inputs.ref_type }}"
+            REF_NAME="${{ inputs.ref_name }}"
+
+            if [[ "${REF_TYPE}" == "tag" ]]; then
+              # If tag is vX.Y.Z..., strip leading v for image tag
+              if [[ "${REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                TAG="${REF_NAME#v}"
+              else
+                # For namespaced tags like api/v18.6.4 -> api-v18.6.4
+                TAG="${REF_NAME//\//-}"
+              fi
             else
-              TAG="$(echo "${GITHUB_SHA}" | cut -c1-12)"
+              # For branch or sha: use short commit
+              TAG="$(git rev-parse --short=12 HEAD)"
             fi
           fi
+
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Using image tag: ${TAG}"
 
